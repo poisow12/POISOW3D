@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { motion } from "framer-motion";
-import { SiInstagram, SiEtsy } from "react-icons/si";
-import { ArrowRight, ChevronRight, PenTool, Layers, Droplet, Zap, Shield, X } from "lucide-react";
+import { motion, useInView } from "framer-motion";
+import { SiInstagram } from "react-icons/si";
+import { ArrowRight, ChevronRight, MapPin, Clock, Star, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -15,15 +15,137 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 const queryClient = new QueryClient();
-
 const INSTAGRAM_URL = "https://www.instagram.com/poisow3d/";
-const ETSY_URL = "https://www.etsy.com/shop/poisow3d";
 
-type OrderModalProps = {
-  open: boolean;
-  onClose: () => void;
-  productName?: string;
-};
+/* ─── Logo Mark ─────────────────────────────────────────────────────────── */
+function LogoMark({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      {/* Bottom layer */}
+      <path d="M4 22 L16 28 L28 22 L16 16 Z" fill="#3F3F46" />
+      {/* Middle layer */}
+      <path d="M4 16 L16 22 L28 16 L16 10 Z" fill="#52525B" />
+      {/* Top layer - orange accent */}
+      <path d="M4 10 L16 16 L28 10 L16 4 Z" fill="#FF5A2A" />
+      {/* Left face bottom */}
+      <path d="M4 16 L4 22 L16 28 L16 22 Z" fill="#27272A" />
+      {/* Right face bottom */}
+      <path d="M28 16 L28 22 L16 28 L16 22 Z" fill="#3F3F46" />
+    </svg>
+  );
+}
+
+/* ─── Printer Visual ─────────────────────────────────────────────────────── */
+function PrinterVisual() {
+  return (
+    <div className="relative w-full flex items-center justify-center py-8 px-4">
+      <svg
+        viewBox="0 0 360 320"
+        fill="none"
+        className="w-full max-w-sm md:max-w-md"
+        style={{ filter: "drop-shadow(0 0 32px rgba(255,90,42,0.12))" }}
+      >
+        {/* Build plate */}
+        <path d="M60 260 L180 300 L300 260 L180 220 Z" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
+        {/* Build plate left face */}
+        <path d="M60 260 L60 268 L180 308 L180 300 Z" fill="#18181B" />
+        {/* Build plate right face */}
+        <path d="M300 260 L300 268 L180 308 L180 300 Z" fill="#27272A" />
+
+        {/* Printed object - layers stacking up */}
+        {/* Layer 1 - base */}
+        <path d="M110 242 L180 262 L250 242 L180 222 Z" fill="#3F3F46" />
+        <path d="M110 234 L110 242 L180 262 L180 254 Z" fill="#27272A" />
+        <path d="M250 234 L250 242 L180 262 L180 254 Z" fill="#52525B" />
+
+        {/* Layer 2 */}
+        <path d="M118 224 L180 244 L242 224 L180 204 Z" fill="#52525B" />
+        <path d="M118 216 L118 224 L180 244 L180 236 Z" fill="#3F3F46" />
+        <path d="M242 216 L242 224 L180 244 L180 236 Z" fill="#71717A" />
+
+        {/* Layer 3 */}
+        <path d="M126 206 L180 226 L234 206 L180 186 Z" fill="#71717A" />
+        <path d="M126 198 L126 206 L180 226 L180 218 Z" fill="#52525B" />
+        <path d="M234 198 L234 206 L180 226 L180 218 Z" fill="#A1A1AA" />
+
+        {/* Layer 4 - partial, being printed */}
+        <motion.path
+          d="M134 188 L180 208 L226 188 L180 168 Z"
+          fill="#FF5A2A"
+          opacity={0.9}
+          animate={{ opacity: [0.5, 0.95, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.path
+          d="M134 180 L134 188 L180 208 L180 200 Z"
+          fill="#CC4822"
+          animate={{ opacity: [0.5, 0.95, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.path
+          d="M226 180 L226 188 L180 208 L180 200 Z"
+          fill="#FF7A54"
+          animate={{ opacity: [0.5, 0.95, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        />
+
+        {/* Gantry arm - horizontal beam */}
+        <rect x="40" y="154" width="280" height="8" rx="2" fill="#3F3F46" />
+        <rect x="40" y="154" width="280" height="3" rx="1" fill="#52525B" />
+
+        {/* Gantry vertical posts */}
+        <rect x="36" y="150" width="10" height="80" rx="2" fill="#3F3F46" />
+        <rect x="314" y="150" width="10" height="80" rx="2" fill="#3F3F46" />
+
+        {/* Print head carriage */}
+        <motion.g
+          animate={{ x: [-60, 60, 60, -60] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", times: [0, 0.45, 0.55, 1] }}
+        >
+          <rect x="165" y="148" width="30" height="28" rx="3" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
+          <rect x="170" y="148" width="20" height="10" rx="1" fill="#3F3F46" />
+          {/* Nozzle */}
+          <path d="M177 176 L183 176 L181 188 L179 188 Z" fill="#52525B" />
+          {/* Nozzle tip glow */}
+          <motion.circle
+            cx="180" cy="188" r="4" fill="#FF5A2A"
+            style={{ transformBox: "fill-box", transformOrigin: "center" }}
+            animate={{ scale: [0.75, 1.4, 0.75], opacity: [0.8, 1, 0.8] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.circle
+            cx="180" cy="188" r="10" fill="#FF5A2A"
+            style={{ transformBox: "fill-box", transformOrigin: "center" }}
+            animate={{ scale: [0.5, 1.1, 0.5], opacity: [0.25, 0.05, 0.25] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </motion.g>
+
+        {/* Frame top bar */}
+        <rect x="36" y="100" width="288" height="12" rx="3" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
+
+        {/* Frame vertical rails */}
+        <rect x="36" y="100" width="10" height="58" rx="2" fill="#27272A" />
+        <rect x="314" y="100" width="10" height="58" rx="2" fill="#27272A" />
+
+        {/* Small screen/display on frame */}
+        <rect x="60" y="104" width="28" height="18" rx="2" fill="#0F0F10" />
+        <rect x="62" y="106" width="24" height="14" rx="1" fill="#1A2A1A" />
+        <motion.rect
+          x="63" y="107" width="14" height="2" rx="0.5" fill="#9FD356"
+          style={{ transformBox: "fill-box", transformOrigin: "left center" }}
+          animate={{ scaleX: [0.28, 1, 0.28] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <rect x="63" y="111" width="16" height="1.5" rx="0.5" fill="#3F3F46" />
+        <rect x="63" y="115" width="12" height="1.5" rx="0.5" fill="#3F3F46" />
+      </svg>
+    </div>
+  );
+}
+
+/* ─── Order Modal ────────────────────────────────────────────────────────── */
+type OrderModalProps = { open: boolean; onClose: () => void; productName?: string };
 
 function OrderModal({ open, onClose, productName = "" }: OrderModalProps) {
   const [name, setName] = useState("");
@@ -32,7 +154,7 @@ function OrderModal({ open, onClose, productName = "" }: OrderModalProps) {
   const [contact, setContact] = useState("");
   const [sent, setSent] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setProduct(productName);
     setSent(false);
   }, [productName, open]);
@@ -40,101 +162,60 @@ function OrderModal({ open, onClose, productName = "" }: OrderModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const body = `Hola! Me llamo ${name} y quiero encargar: ${product}.\n\nDetalles: ${details}\n\nContacto: ${contact}`;
-    const subject = encodeURIComponent(`Encargo poisow 3d — ${product}`);
-    const bodyEncoded = encodeURIComponent(body);
-    window.open(`mailto:poisow3d@gmail.com?subject=${subject}&body=${bodyEncoded}`, "_blank");
+    window.open(`mailto:poisow3d@gmail.com?subject=${encodeURIComponent(`Encargo poisow 3d — ${product}`)}&body=${encodeURIComponent(body)}`, "_blank");
     setSent(true);
   };
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="rounded-none border-primary bg-card max-w-lg w-full p-0 gap-0">
+      <DialogContent className="rounded-none border-primary/40 bg-card max-w-lg w-full p-0 gap-0">
         <div className="h-1 w-full bg-primary" />
-        <div className="p-6">
+        <div className="p-6 md:p-8">
           <DialogHeader className="mb-6">
-            <DialogTitle className="font-mono text-2xl font-bold">
-              Pedir encargo<span className="text-primary">_</span>
+            <DialogTitle className="font-mono text-2xl font-bold flex items-center gap-2">
+              <LogoMark size={24} />
+              Pedir encargo
             </DialogTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Rellena el formulario y te contactamos con precio y plazo.
+              Rellena el formulario y te respondo con precio y plazo en menos de 24h.
             </p>
           </DialogHeader>
 
           {sent ? (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center py-8 flex flex-col items-center gap-4"
-            >
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center py-8 flex flex-col items-center gap-4">
               <div className="w-16 h-16 border-2 border-primary flex items-center justify-center">
-                <span className="font-mono text-primary text-3xl font-black">✓</span>
+                <CheckCircle2 className="w-8 h-8 text-primary" />
               </div>
               <h3 className="font-mono text-xl font-bold">Encargo enviado</h3>
               <p className="text-muted-foreground text-sm max-w-xs">
-                Se ha abierto tu cliente de correo con los detalles. Te responderemos lo antes posible.
+                Se ha abierto tu cliente de correo. Te respondo en menos de 24 horas.
               </p>
-              <Button
-                variant="outline"
-                className="font-mono rounded-none border-muted mt-2"
-                onClick={onClose}
-              >
-                Cerrar
-              </Button>
+              <Button variant="outline" className="font-mono rounded-none border-muted mt-2" onClick={onClose}>Cerrar</Button>
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Tu nombre</Label>
-                <Input
-                  data-testid="input-order-name"
-                  className="rounded-none border-muted bg-background font-mono focus-visible:ring-primary"
-                  placeholder="Nombre o alias"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Tu nombre</Label>
+                  <Input data-testid="input-order-name" className="rounded-none border-muted bg-background font-mono" placeholder="Nombre o alias" value={name} onChange={(e) => setName(e.target.value)} required />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Producto</Label>
+                  <Input data-testid="input-order-product" className="rounded-none border-muted bg-background font-mono" placeholder="Ej: Llavero personalizado" value={product} onChange={(e) => setProduct(e.target.value)} required />
+                </div>
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Producto</Label>
-                <Input
-                  data-testid="input-order-product"
-                  className="rounded-none border-muted bg-background font-mono focus-visible:ring-primary"
-                  placeholder="Ej: Llavero personalizado"
-                  value={product}
-                  onChange={(e) => setProduct(e.target.value)}
-                  required
-                />
+                <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Cuéntame tu idea</Label>
+                <Textarea data-testid="input-order-details" className="rounded-none border-muted bg-background font-mono min-h-[110px] resize-none" placeholder="Colores, medidas, referencia de imagen, fichero STL... Cuanto más detalle mejor." value={details} onChange={(e) => setDetails(e.target.value)} required />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Detalles del encargo</Label>
-                <Textarea
-                  data-testid="input-order-details"
-                  className="rounded-none border-muted bg-background font-mono focus-visible:ring-primary min-h-[100px] resize-none"
-                  placeholder="Describe tu idea, colores, medidas, referencia de imagen..."
-                  value={details}
-                  onChange={(e) => setDetails(e.target.value)}
-                  required
-                />
+                <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">¿Cómo te contacto?</Label>
+                <Input data-testid="input-order-contact" className="rounded-none border-muted bg-background font-mono" placeholder="tu@email.com o @tuinstagram" value={contact} onChange={(e) => setContact(e.target.value)} required />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Tu contacto (email o Instagram)</Label>
-                <Input
-                  data-testid="input-order-contact"
-                  className="rounded-none border-muted bg-background font-mono focus-visible:ring-primary"
-                  placeholder="tu@email.com o @tuinstagram"
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                  required
-                />
-              </div>
-              <Button
-                data-testid="button-order-submit"
-                type="submit"
-                size="lg"
-                className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none mt-2 h-12"
-              >
+              <Button data-testid="button-order-submit" type="submit" size="lg" className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none mt-2 h-12">
                 Enviar encargo <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
+              <p className="text-xs text-muted-foreground/60 text-center font-mono">Respuesta garantizada en menos de 24h</p>
             </form>
           )}
         </div>
@@ -143,29 +224,24 @@ function OrderModal({ open, onClose, productName = "" }: OrderModalProps) {
   );
 }
 
+/* ─── Navbar ─────────────────────────────────────────────────────────────── */
 function Navbar({ onOrderClick }: { onOrderClick: () => void }) {
-  const scrollTo = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth" });
-  };
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-b border-border">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-1 font-mono text-xl font-bold tracking-tight">
-          poisow 3d<span className="text-primary">_</span>
+        <div className="flex items-center gap-2.5 font-mono text-lg font-bold tracking-tight">
+          <LogoMark size={26} />
+          poisow 3d
         </div>
         <div className="hidden md:flex items-center gap-8 font-mono text-sm">
           <button data-testid="link-nav-catalogo" onClick={() => scrollTo("catalogo")} className="text-muted-foreground hover:text-foreground transition-colors">Catálogo</button>
           <button data-testid="link-nav-como-funciona" onClick={() => scrollTo("como-funciona")} className="text-muted-foreground hover:text-foreground transition-colors">Cómo funciona</button>
-          <button data-testid="link-nav-encargo" onClick={() => scrollTo("encargo")} className="text-muted-foreground hover:text-foreground transition-colors">Encargo a medida</button>
+          <button data-testid="link-nav-encargo" onClick={() => scrollTo("encargo")} className="text-muted-foreground hover:text-foreground transition-colors">Encargo</button>
           <button data-testid="link-nav-materiales" onClick={() => scrollTo("materiales")} className="text-muted-foreground hover:text-foreground transition-colors">Materiales</button>
         </div>
-        <Button
-          data-testid="button-nav-order"
-          className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none h-10 px-6"
-          onClick={onOrderClick}
-        >
+        <Button data-testid="button-nav-order" className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none h-10 px-6" onClick={onOrderClick}>
           Pedir encargo
         </Button>
       </div>
@@ -173,227 +249,215 @@ function Navbar({ onOrderClick }: { onOrderClick: () => void }) {
   );
 }
 
-function LayerAnimation() {
-  return (
-    <div className="relative w-full aspect-square md:aspect-[4/3] flex items-center justify-center p-8">
-      <div className="relative w-64 h-64 perspective-1000 transform-style-3d rotate-x-60 rotate-z-45">
-        {[...Array(6)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute inset-0 border border-secondary/50 bg-secondary/10 backdrop-blur-sm"
-            style={{ transformOrigin: "center center" }}
-            animate={{ translateZ: [0, (i + 1) * 20], opacity: [0, 1, 1] }}
-            transition={{ duration: 2, delay: i * 0.4, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
-          />
-        ))}
-        <motion.div
-          className="absolute top-1/2 left-1/2 w-4 h-4 bg-primary rounded-full blur-sm"
-          animate={{ x: [-50, 50, 50, -50, -50], y: [-50, -50, 50, 50, -50], translateZ: [130, 130, 130, 130, 130] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-        />
-      </div>
-    </div>
-  );
-}
-
+/* ─── Hero ───────────────────────────────────────────────────────────────── */
 function Hero({ onOrderClick }: { onOrderClick: () => void }) {
-  const scrollTo = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth" });
-  };
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    <section className="pt-32 pb-20 md:pt-48 md:pb-32 px-6 max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
-      <div className="flex-1 flex flex-col items-start space-y-6">
-        <h1 className="font-mono text-5xl md:text-7xl font-bold tracking-tight leading-tight text-foreground">
-          Tu idea,<br />impresa<br />capa a capa.
-        </h1>
-        <p className="text-muted-foreground text-lg md:text-xl max-w-md">
-          Diseño y fabricación de piezas 3D personalizadas. Calidad Bambu Lab, precio justo.
-        </p>
-        <div className="flex flex-wrap items-center gap-4 pt-4">
-          <Button
-            data-testid="button-hero-catalog"
-            size="lg"
-            className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none"
-            onClick={() => scrollTo("catalogo")}
-          >
-            Ver catálogo
-          </Button>
-          <Button
-            data-testid="button-hero-order"
-            size="lg"
-            variant="outline"
-            className="font-mono rounded-none border-muted bg-transparent hover:bg-muted"
-            onClick={onOrderClick}
-          >
-            Pedir encargo a medida
-          </Button>
+    <section className="pt-28 pb-16 md:pt-40 md:pb-28 px-6 max-w-6xl mx-auto">
+      <div className="flex flex-col md:flex-row items-center gap-12 md:gap-16">
+        <div className="flex-1 flex flex-col items-start space-y-6">
+          {/* Local trust badge */}
+          <div className="flex items-center gap-2 text-sm font-mono text-muted-foreground border border-muted px-3 py-1.5">
+            <MapPin className="w-3.5 h-3.5 text-primary" />
+            Bilbao · Trato directo · Sin intermediarios
+          </div>
+
+          <h1 className="font-mono text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05] text-foreground">
+            Tu idea,<br />impresa<br /><span className="text-primary">capa a capa.</span>
+          </h1>
+
+          <p className="text-muted-foreground text-lg max-w-md leading-relaxed">
+            Piezas 3D personalizadas impresas con precisión. Hablas directamente conmigo, sin formularios perdidos ni esperas innecesarias.
+          </p>
+
+          {/* Trust signals */}
+          <div className="flex flex-wrap gap-4 text-xs font-mono text-muted-foreground">
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-secondary" /> Respuesta en 24h</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-secondary" /> Precio cerrado antes de imprimir</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-secondary" /> Envío o recogida en mano</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 pt-2">
+            <Button data-testid="button-hero-order" size="lg" className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none" onClick={onOrderClick}>
+              Pedir encargo <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
+            <Button data-testid="button-hero-catalog" size="lg" variant="ghost" className="font-mono rounded-none hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => scrollTo("catalogo")}>
+              Ver catálogo
+            </Button>
+          </div>
         </div>
-      </div>
-      <div className="flex-1 w-full flex justify-center border border-muted bg-card">
-        <LayerAnimation />
+
+        <div className="flex-1 w-full bg-card border border-muted relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,90,42,0.06)_0%,transparent_70%)]" />
+          <PrinterVisual />
+        </div>
       </div>
     </section>
   );
 }
 
+/* ─── Catalog ────────────────────────────────────────────────────────────── */
 const PRODUCTS = [
   {
     name: "Llavero personalizado",
-    desc: "Tu nombre, logo o diseño favorito. Mini y duradero.",
+    desc: "Con tu nombre, initiales, logo o diseño favorito. Pequeño, ligero y resistente.",
+    detail: "Perfecto como regalo o para identificar tus llaves con estilo.",
     price: "4,50€",
-    badge: "Más vendido",
+    badge: "Más pedido",
+    badgeColor: "text-primary border-primary/40 bg-primary/10",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-12 h-12 text-primary">
-        <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
-        <path d="M11 9l9 9" />
-        <path d="M17 18l3-3" />
+      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+        <circle cx="22" cy="20" r="12" stroke="#FF5A2A" strokeWidth="2.5" />
+        <circle cx="22" cy="20" r="6" stroke="#FF5A2A" strokeWidth="1.5" strokeDasharray="3 2" />
+        <path d="M31 27 L52 48" stroke="#71717A" strokeWidth="3" strokeLinecap="round" />
+        <path d="M46 44 L56 44" stroke="#FF5A2A" strokeWidth="2.5" strokeLinecap="round" />
+        <rect x="30" y="45" width="18" height="8" rx="4" stroke="#52525B" strokeWidth="2" />
       </svg>
     )
   },
   {
     name: "Soporte de móvil",
-    desc: "Para escritorio o coche. Ajustable y sólido.",
+    desc: "Para escritorio o uso vertical. Estable, con el ángulo que necesites.",
+    detail: "Diseño limpio que encaja en cualquier espacio de trabajo.",
     price: "7€",
     badge: "Popular",
+    badgeColor: "text-secondary border-secondary/40 bg-secondary/10",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-12 h-12 text-secondary">
-        <rect x="5" y="2" width="14" height="20" rx="2" />
-        <path d="M12 18h.01" />
+      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+        <rect x="20" y="8" width="24" height="38" rx="3" stroke="#9FD356" strokeWidth="2.5" />
+        <rect x="23" y="11" width="18" height="26" rx="1" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
+        <circle cx="32" cy="42" r="2" stroke="#9FD356" strokeWidth="1.5" />
+        <path d="M20 48 L14 56" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M44 48 L50 56" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M10 56 L54 56" stroke="#71717A" strokeWidth="2" strokeLinecap="round" />
       </svg>
     )
   },
   {
     name: "Figura gaming / meme",
-    desc: "Personajes, logos, memes impresos en 3D. Desde diseño propio o tuyo.",
+    desc: "Personajes, logos, memes en 3D desde tu imagen o diseño. Cada pieza es única.",
+    detail: "Trae tu referencia y lo imprimimos tal cual.",
     price: "desde 6€",
-    badge: "Personalizable",
+    badge: "A medida",
+    badgeColor: "text-primary border-primary/40 bg-primary/10",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-12 h-12 text-primary">
-        <rect x="2" y="6" width="20" height="12" rx="2" />
-        <path d="M6 12h4" />
-        <path d="M8 10v4" />
-        <circle cx="15" cy="13" r="1" />
-        <circle cx="18" cy="11" r="1" />
+      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+        <rect x="8" y="24" width="48" height="28" rx="8" stroke="#FF5A2A" strokeWidth="2.5" />
+        <path d="M20 36 L20 44" stroke="#FF5A2A" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M16 40 L24 40" stroke="#FF5A2A" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="42" cy="39" r="2.5" fill="#FF5A2A" />
+        <circle cx="48" cy="35" r="2.5" fill="#9FD356" />
+        <path d="M22 24 C22 14 42 14 42 24" stroke="#52525B" strokeWidth="2" strokeDasharray="3 2" />
+        <circle cx="32" cy="11" r="5" stroke="#71717A" strokeWidth="1.5" />
       </svg>
     )
   },
   {
     name: "Organizador de escritorio",
-    desc: "Compartimentos para cables, bolígrafos y lo que quieras.",
+    desc: "Compartimentos para bolígrafos, cables, notas o lo que necesites tener a mano.",
+    detail: "Las medidas y divisiones, a tu gusto.",
     price: "9€",
     badge: "Personalizable",
+    badgeColor: "text-secondary border-secondary/40 bg-secondary/10",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-12 h-12 text-secondary">
-        <rect x="3" y="14" width="18" height="8" rx="1" />
-        <path d="M7 14v-6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v6" />
-        <path d="M12 14v-4" />
+      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+        <rect x="8" y="28" width="48" height="28" rx="2" stroke="#9FD356" strokeWidth="2.5" />
+        <path d="M24 28 L24 56" stroke="#9FD356" strokeWidth="1.5" />
+        <path d="M40 28 L40 56" stroke="#9FD356" strokeWidth="1.5" />
+        <path d="M16 10 L16 28" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
+        <path d="M32 8 L32 28" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
+        <path d="M48 13 L48 28" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
+        <path d="M12 10 L20 10" stroke="#71717A" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M28 8 L36 8" stroke="#71717A" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     )
   },
   {
-    name: "Maceta / decoración",
-    desc: "Diseños geométricos, modernos o a medida. Para plantas pequeñas.",
+    name: "Maceta decorativa",
+    desc: "Geométrica, moderna o con diseño propio. Para plantas pequeñas o suculentas.",
+    detail: "Con o sin agujero de drenaje, a elegir.",
     price: "desde 5€",
     badge: "Ecofriendly",
+    badgeColor: "text-secondary border-secondary/40 bg-secondary/10",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-12 h-12 text-primary">
-        <path d="M12 10v12" />
-        <path d="M12 10a4 4 0 0 0-8 0" />
-        <path d="M12 10a4 4 0 0 1 8 0" />
-        <path d="M7 22h10" />
+      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+        <path d="M16 28 L20 52 L44 52 L48 28 Z" stroke="#9FD356" strokeWidth="2.5" strokeLinejoin="round" />
+        <path d="M12 28 L52 28" stroke="#9FD356" strokeWidth="2" strokeLinecap="round" />
+        <path d="M32 28 C32 20 32 14 32 14" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
+        <path d="M32 20 C26 16 22 11 28 8" stroke="#9FD356" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M32 17 C38 13 42 8 36 6" stroke="#9FD356" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     )
   },
   {
-    name: "Diseño a medida",
-    desc: "¿Tienes una idea? La imprimo. Trae tu STL o cuéntame qué necesitas.",
+    name: "Pieza a medida",
+    desc: "¿Tienes un STL, una imagen o solo una idea? Lo imprimimos sin problema.",
+    detail: "Presupuesto sin compromiso antes de confirmar.",
     price: "Consultar",
-    badge: "Personalizado",
-    icon: <PenTool className="w-12 h-12 text-secondary" />
+    badge: "100% personalizado",
+    badgeColor: "text-primary border-primary/40 bg-primary/10",
+    icon: (
+      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+        <path d="M12 20 L32 10 L52 20 L52 44 L32 54 L12 44 Z" stroke="#FF5A2A" strokeWidth="2.5" strokeLinejoin="round" />
+        <path d="M12 20 L32 30 L52 20" stroke="#FF5A2A" strokeWidth="1.5" />
+        <path d="M32 30 L32 54" stroke="#FF5A2A" strokeWidth="1.5" />
+        <circle cx="46" cy="46" r="12" fill="#18181B" />
+        <path d="M46 40 L46 52" stroke="#9FD356" strokeWidth="2" strokeLinecap="round" />
+        <path d="M40 46 L52 46" stroke="#9FD356" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    )
   }
 ];
 
-function Catalog({ onOrderClick }: { onOrderClick: (product: string) => void }) {
+function Catalog({ onOrderClick }: { onOrderClick: (p: string) => void }) {
   return (
-    <section id="catalogo" className="py-24 px-6 max-w-6xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="mb-12"
-      >
-        <h2 className="font-mono text-3xl font-bold tracking-tight">Catálogo<span className="text-primary">_</span></h2>
-      </motion.div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {PRODUCTS.map((prod, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.1 }}
-          >
-            <Card data-testid={`card-product-${i}`} className="rounded-none border-muted bg-card hover:border-primary/50 transition-colors p-6 flex flex-col h-full">
-              <div className="flex justify-between items-start mb-6">
-                <div className="p-3 bg-muted/30 border border-muted">{prod.icon}</div>
-                <Badge variant="secondary" className="font-mono text-xs rounded-none bg-muted text-muted-foreground">{prod.badge}</Badge>
-              </div>
-              <h3 className="font-mono text-xl font-bold mb-2">{prod.name}</h3>
-              <p className="text-muted-foreground text-sm flex-1 mb-6">{prod.desc}</p>
-              <div className="flex items-center justify-between mt-auto">
-                <span className="font-mono font-bold text-lg">{prod.price}</span>
-                <Button
-                  data-testid={`button-order-product-${i}`}
-                  variant="outline"
-                  className="font-mono rounded-none border-muted hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                  onClick={() => onOrderClick(prod.name)}
-                >
-                  Encargar
-                </Button>
-              </div>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function HowItWorks() {
-  const steps = [
-    { num: "01", title: "Rellena el formulario", desc: "Cuéntame qué necesitas desde esta misma página." },
-    { num: "02", title: "Te paso precio y plazo", desc: "Te confirmo el coste y cuándo estará listo." },
-    { num: "03", title: "Imprimo la pieza", desc: "La Bambu Lab A1 Combo hace el trabajo con precisión." },
-    { num: "04", title: "Recoges o te la envío", desc: "Recogida en persona o envío a tu dirección." }
-  ];
-
-  return (
-    <section id="como-funciona" className="py-24 bg-card border-y border-muted">
-      <div className="px-6 max-w-6xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mb-16"
-        >
-          <h2 className="font-mono text-3xl font-bold tracking-tight">Cómo funciona un encargo<span className="text-secondary">_</span></h2>
+    <section id="catalogo" className="py-24 px-6 bg-card border-y border-muted">
+      <div className="max-w-6xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-4">
+          <p className="font-mono text-xs text-primary uppercase tracking-widest mb-2">Lo que imprimo</p>
+          <h2 className="font-mono text-3xl font-bold tracking-tight">Catálogo<span className="text-primary">_</span></h2>
         </motion.div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
-          <div className="hidden md:block absolute top-12 left-0 w-full h-[1px] bg-muted" />
-          {steps.map((step, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="relative bg-card"
-            >
-              <div className="font-mono text-6xl font-black text-primary/20 mb-6">{step.num}</div>
-              <h3 className="font-mono text-lg font-bold mb-3">{step.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
+        <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-muted-foreground mb-12 max-w-xl">
+          Productos habituales con precio fijo. Si lo que buscas no está aquí, escríbeme y lo hablamos.
+        </motion.p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {PRODUCTS.map((prod, i) => (
+            <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.07 }}>
+              <Card
+                data-testid={`card-product-${i}`}
+                className="rounded-none border-muted bg-background hover:border-primary/60 transition-all duration-200 group flex flex-col h-full overflow-hidden"
+              >
+                {/* Card header with icon */}
+                <div className="p-6 pb-4 bg-card border-b border-muted flex items-end justify-between">
+                  <div className="p-2">{prod.icon}</div>
+                  <Badge variant="outline" className={`font-mono text-xs rounded-none ${prod.badgeColor}`}>
+                    {prod.badge}
+                  </Badge>
+                </div>
+
+                <div className="p-6 flex flex-col flex-1">
+                  <h3 className="font-mono text-lg font-bold mb-1 group-hover:text-primary transition-colors">{prod.name}</h3>
+                  <p className="text-muted-foreground text-sm mb-2 leading-relaxed">{prod.desc}</p>
+                  <p className="text-xs text-muted-foreground/60 font-mono mb-6 italic">{prod.detail}</p>
+
+                  <div className="flex items-center justify-between mt-auto pt-4 border-t border-muted">
+                    <div>
+                      <span className="font-mono font-black text-xl text-foreground">{prod.price}</span>
+                    </div>
+                    <Button
+                      data-testid={`button-order-product-${i}`}
+                      variant="outline"
+                      size="sm"
+                      className="font-mono rounded-none border-muted hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
+                      onClick={() => onOrderClick(prod.name)}
+                    >
+                      Encargar
+                    </Button>
+                  </div>
+                </div>
+              </Card>
             </motion.div>
           ))}
         </div>
@@ -402,96 +466,159 @@ function HowItWorks() {
   );
 }
 
-function CustomOrder({ onOrderClick }: { onOrderClick: () => void }) {
-  return (
-    <section id="encargo" className="py-24 px-6 max-w-6xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        whileInView={{ opacity: 1, scale: 1 }}
-        viewport={{ once: true }}
-      >
-        <Card className="rounded-none border-primary bg-primary/5 p-8 md:p-12 text-center flex flex-col items-center">
-          <h2 className="font-mono text-sm mb-4 text-primary uppercase tracking-widest font-bold">Encargo a medida</h2>
-          <h3 className="font-mono text-4xl md:text-5xl font-bold mb-6">¿Tienes una idea en mente?</h3>
-          <p className="text-muted-foreground text-lg max-w-2xl mb-8">
-            Si tienes un diseño STL, una imagen de referencia, o simplemente una idea, puedo hacerlo realidad. Rellena el formulario y te respondo con precio y plazo.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center gap-4 text-sm font-mono text-muted-foreground mb-10">
-            <span>Describe tu idea</span>
-            <ChevronRight className="w-4 h-4 hidden sm:block text-primary" />
-            <span>Te confirmo precio</span>
-            <ChevronRight className="w-4 h-4 hidden sm:block text-primary" />
-            <span>Lo imprimo</span>
-            <ChevronRight className="w-4 h-4 hidden sm:block text-primary" />
-            <span>Te lo envío</span>
-          </div>
-          <Button
-            data-testid="button-custom-order"
-            size="lg"
-            className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none text-lg px-8 h-14"
-            onClick={onOrderClick}
-          >
-            Pedir encargo <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
-        </Card>
-      </motion.div>
-    </section>
-  );
-}
+/* ─── How It Works ───────────────────────────────────────────────────────── */
+function HowItWorks() {
+  const steps = [
+    { num: "01", title: "Rellena el formulario", desc: "Cuéntame qué necesitas — producto, medidas, colores o el fichero STL." },
+    { num: "02", title: "Precio y plazo cerrado", desc: "Te confirmo el coste exacto y cuándo estará listo. Sin sorpresas." },
+    { num: "03", title: "Lo imprimo con cuidado", desc: "Cada pieza se revisa antes de salir. Si algo no está bien, lo repito." },
+    { num: "04", title: "Lo recibes", desc: "Recogida en mano o envío a tu dirección. Tú eliges." }
+  ];
 
-const MATERIALS = [
-  {
-    name: "PLA",
-    desc: "El más común y versátil. Acabado limpio, buena resistencia y fácil de imprimir. Ideal para decoración, figuras y accesorios del día a día.",
-    accent: "bg-secondary",
-    icon: <Layers className="w-8 h-8 text-secondary mb-4" />,
-  },
-  {
-    name: "PETG",
-    desc: "Más resistente al calor y la humedad que el PLA. Perfecto para piezas funcionales, de exterior o que estén en contacto con agua.",
-    accent: "bg-blue-400",
-    icon: <Droplet className="w-8 h-8 text-blue-400 mb-4" />,
-  },
-  {
-    name: "TPU",
-    desc: "Filamento flexible y elástico. Ideal para fundas de móvil, protectores, juntas y cualquier pieza que necesite absorber impactos.",
-    accent: "bg-primary",
-    icon: <Zap className="w-8 h-8 text-primary mb-4" />,
-  },
-  {
-    name: "ABS",
-    desc: "Alta resistencia mecánica y térmica. Para piezas técnicas o funcionales que trabajan en entornos exigentes. Acabado liso y duradero.",
-    accent: "bg-zinc-400",
-    icon: <Shield className="w-8 h-8 text-zinc-400 mb-4" />,
-  }
-];
-
-function Materials() {
   return (
-    <section id="materiales" className="py-24 px-6 max-w-6xl mx-auto border-t border-muted">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="mb-12"
-      >
-        <h2 className="font-mono text-3xl font-bold tracking-tight">Materiales<span className="text-primary">_</span></h2>
+    <section id="como-funciona" className="py-24 px-6 max-w-6xl mx-auto">
+      <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-4">
+        <p className="font-mono text-xs text-secondary uppercase tracking-widest mb-2">El proceso</p>
+        <h2 className="font-mono text-3xl font-bold tracking-tight">Cómo funciona<span className="text-secondary">_</span></h2>
       </motion.div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {MATERIALS.map((mat, i) => (
+      <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-muted-foreground mb-16 max-w-xl">
+        Sencillo y sin complicaciones. De tu idea a tu puerta en unos pocos pasos.
+      </motion.p>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
+        <div className="hidden md:block absolute top-8 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-muted to-transparent" />
+        {steps.map((step, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: i * 0.1 }}
+            transition={{ delay: i * 0.12 }}
+            className="relative"
           >
-            <Card data-testid={`card-material-${i}`} className="rounded-none border-muted bg-card overflow-hidden h-full">
-              <div className={`h-1.5 w-full ${mat.accent}`} />
+            <div className="w-16 h-16 border border-muted bg-card flex items-center justify-center mb-6">
+              <span className="font-mono text-2xl font-black text-primary">{step.num}</span>
+            </div>
+            <h3 className="font-mono text-base font-bold mb-3 leading-tight">{step.title}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ─── Custom Order CTA ───────────────────────────────────────────────────── */
+function CustomOrder({ onOrderClick }: { onOrderClick: () => void }) {
+  return (
+    <section id="encargo" className="py-24 px-6 bg-card border-y border-muted">
+      <div className="max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
+            <p className="font-mono text-xs text-primary uppercase tracking-widest mb-3">Encargo a medida</p>
+            <h2 className="font-mono text-4xl md:text-5xl font-bold mb-6 leading-tight">
+              ¿Tienes una<br /><span className="text-primary">idea en mente?</span>
+            </h2>
+            <p className="text-muted-foreground text-lg leading-relaxed mb-8">
+              Si tienes un diseño STL, una imagen de referencia o simplemente una idea en la cabeza, lo hago realidad. Escríbeme sin compromiso y te doy precio antes de imprimir nada.
+            </p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-8 font-mono text-sm text-muted-foreground">
+              {["Describe tu idea", "Precio cerrado", "Lo imprimo", "Lo recibes"].map((s, i) => (
+                <React.Fragment key={i}>
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-primary font-bold">{String(i + 1).padStart(2, "0")}.</span> {s}
+                  </span>
+                  {i < 3 && <ChevronRight className="w-4 h-4 text-muted hidden sm:block" />}
+                </React.Fragment>
+              ))}
+            </div>
+            <Button data-testid="button-custom-order" size="lg" className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none px-8 h-12" onClick={onOrderClick}>
+              Pedir encargo <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
+          </motion.div>
+
+          {/* Trust block */}
+          <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="flex flex-col gap-4">
+            {[
+              { icon: <Clock className="w-5 h-5 text-primary" />, title: "Respuesta en menos de 24h", desc: "Te confirmo si puedo hacerlo y a qué precio antes de que pasen 24 horas." },
+              { icon: <CheckCircle2 className="w-5 h-5 text-secondary" />, title: "Precio cerrado antes de imprimir", desc: "No hay sorpresas. Acordamos el precio y no cambia, salvo que tú lo pidas." },
+              { icon: <Star className="w-5 h-5 text-primary" />, title: "Calidad o lo repito", desc: "Si la pieza no te convence, la volvemos a imprimir. Así de sencillo." },
+            ].map((item, i) => (
+              <div key={i} className="flex gap-4 p-5 border border-muted bg-background">
+                <div className="mt-0.5 shrink-0">{item.icon}</div>
+                <div>
+                  <h4 className="font-mono text-sm font-bold mb-1">{item.title}</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Materials ──────────────────────────────────────────────────────────── */
+const MATERIALS = [
+  {
+    name: "PLA",
+    tag: "El más común",
+    desc: "Versátil y con acabado muy limpio. Ideal para decoración, figuras y accesorios del día a día. Amplia gama de colores.",
+    accent: "bg-secondary",
+    pros: ["Buen acabado", "Colores vivos", "Fácil de limpiar"],
+  },
+  {
+    name: "PETG",
+    tag: "Resistente",
+    desc: "Aguanta calor y humedad mejor que el PLA. Perfecto para piezas funcionales, de exterior o que estén en contacto con agua.",
+    accent: "bg-blue-400",
+    pros: ["Resistente al calor", "Soporta humedad", "Alta durabilidad"],
+  },
+  {
+    name: "TPU",
+    tag: "Flexible",
+    desc: "Filamento elástico y blando. Para fundas de móvil, protectores, juntas y cualquier pieza que necesite flexibilidad.",
+    accent: "bg-primary",
+    pros: ["Elástico y suave", "Absorbe impactos", "Resistente al desgaste"],
+  },
+  {
+    name: "ABS",
+    tag: "Técnico",
+    desc: "Alta resistencia mecánica y térmica. Para piezas que trabajan en entornos exigentes o requieren mecanizado posterior.",
+    accent: "bg-zinc-400",
+    pros: ["Alta resistencia", "Fácil de lijar", "Acabado liso"],
+  }
+];
+
+function Materials() {
+  return (
+    <section id="materiales" className="py-24 px-6 max-w-6xl mx-auto">
+      <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-4">
+        <p className="font-mono text-xs text-primary uppercase tracking-widest mb-2">Con qué imprimo</p>
+        <h2 className="font-mono text-3xl font-bold tracking-tight">Materiales<span className="text-primary">_</span></h2>
+      </motion.div>
+      <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-muted-foreground mb-12 max-w-xl">
+        Cada material tiene sus ventajas. Si no sabes cuál elegir, te asesoro sin coste.
+      </motion.p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {MATERIALS.map((mat, i) => (
+          <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}>
+            <Card data-testid={`card-material-${i}`} className="rounded-none border-muted bg-card overflow-hidden h-full hover:border-muted-foreground/40 transition-colors">
+              <div className={`h-1 w-full ${mat.accent}`} />
               <div className="p-6">
-                {mat.icon}
-                <h3 className="font-mono text-xl font-bold mb-3">{mat.name}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{mat.desc}</p>
+                <div className="flex items-baseline gap-2 mb-4">
+                  <h3 className="font-mono text-2xl font-black">{mat.name}</h3>
+                  <span className="font-mono text-xs text-muted-foreground">{mat.tag}</span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed mb-5">{mat.desc}</p>
+                <ul className="space-y-1.5">
+                  {mat.pros.map((pro, j) => (
+                    <li key={j} className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+                      <span className="w-1 h-1 rounded-full bg-primary shrink-0" />{pro}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </Card>
           </motion.div>
@@ -501,31 +628,33 @@ function Materials() {
   );
 }
 
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
 function Footer() {
   return (
     <footer className="border-t border-muted bg-card py-12 px-6">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="font-mono text-xl font-bold tracking-tight">
-          poisow 3d<span className="text-primary">_</span>
+        <div className="flex items-center gap-2.5 font-mono text-lg font-bold">
+          <LogoMark size={24} />
+          poisow 3d
         </div>
-        <div className="flex items-center gap-6">
-          <a data-testid="link-footer-instagram" href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
-            <SiInstagram className="w-6 h-6" />
-            <span className="sr-only">Instagram</span>
-          </a>
-          <a data-testid="link-footer-etsy" href={ETSY_URL} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
-            <SiEtsy className="w-6 h-6" />
-            <span className="sr-only">Etsy</span>
-          </a>
+        <div className="flex items-center gap-4 text-sm font-mono text-muted-foreground">
+          <MapPin className="w-3.5 h-3.5" />
+          Bilbao, España
         </div>
+        <a data-testid="link-footer-instagram" href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors font-mono text-sm">
+          <SiInstagram className="w-5 h-5" />
+          @poisow3d
+        </a>
       </div>
-      <div className="max-w-6xl mx-auto mt-8 text-center text-xs text-muted-foreground/50 font-mono">
-        © {new Date().getFullYear()} poisow 3d. Todos los derechos reservados.
+      <div className="max-w-6xl mx-auto mt-8 flex flex-col md:flex-row justify-between items-center gap-2 text-xs text-muted-foreground/40 font-mono">
+        <span>© {new Date().getFullYear()} poisow 3d. Todos los derechos reservados.</span>
+        <span>Impresión 3D · Piezas personalizadas · Bilbao</span>
       </div>
     </footer>
   );
 }
 
+/* ─── Home ───────────────────────────────────────────────────────────────── */
 function Home() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState("");
@@ -546,15 +675,12 @@ function Home() {
         <Materials />
       </main>
       <Footer />
-      <OrderModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        productName={selectedProduct}
-      />
+      <OrderModal open={modalOpen} onClose={() => setModalOpen(false)} productName={selectedProduct} />
     </div>
   );
 }
 
+/* ─── App ────────────────────────────────────────────────────────────────── */
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -563,9 +689,7 @@ function App() {
           <Switch>
             <Route path="/" component={Home} />
             <Route>
-              <div className="min-h-screen flex items-center justify-center font-mono">
-                Página no encontrada_
-              </div>
+              <div className="min-h-screen flex items-center justify-center font-mono">Página no encontrada_</div>
             </Route>
           </Switch>
         </WouterRouter>
