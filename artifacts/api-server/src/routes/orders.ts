@@ -6,6 +6,30 @@ import { requireAdmin } from "../middlewares/requireAdmin";
 
 const router: IRouter = Router();
 
+const NTFY_TOPIC = process.env["NTFY_TOPIC"] ?? "poisow3d-encargos-zjybmyuppu";
+
+async function notifyNewOrder(order: {
+  id: number;
+  name: string;
+  product: string;
+  contact: string;
+}): Promise<void> {
+  try {
+    await fetch(`https://ntfy.sh/${NTFY_TOPIC}`, {
+      method: "POST",
+      headers: {
+        "Title": `Nuevo encargo #${order.id} — ${order.product}`,
+        "Priority": "high",
+        "Tags": "printer",
+        "Content-Type": "text/plain",
+      },
+      body: `De: ${order.name}\nContacto: ${order.contact}\nProducto: ${order.product}`,
+    });
+  } catch {
+    // notification failure is non-critical
+  }
+}
+
 const CreateOrderBody = z.object({
   name: z.string().min(1),
   product: z.string().min(1),
@@ -22,6 +46,14 @@ router.post("/orders", async (req, res): Promise<void> => {
   const [order] = await db.insert(ordersTable).values(parsed.data).returning();
   req.log.info({ orderId: order.id }, "New order created");
   res.status(201).json({ id: order.id });
+
+  // Fire-and-forget notification (after response is sent)
+  void notifyNewOrder({
+    id: order.id,
+    name: order.name,
+    product: order.product,
+    contact: order.contact,
+  });
 });
 
 router.get("/orders", requireAdmin, async (req, res): Promise<void> => {
