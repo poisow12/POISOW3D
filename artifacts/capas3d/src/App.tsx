@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { motion, useInView } from "framer-motion";
 import { SiInstagram } from "react-icons/si";
-import { ArrowRight, ChevronRight, MapPin, Clock, Star, CheckCircle2 } from "lucide-react";
+import { ArrowRight, ChevronRight, MapPin, Clock, Star, CheckCircle2, Trash2, Copy, Download, Search, ChevronDown, ChevronUp, StickyNote, LogOut, RefreshCw, X, AlertTriangle, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -787,6 +787,7 @@ type Order = {
   details: string;
   contact: string;
   status: string;
+  notes: string;
   createdAt: string;
 };
 
@@ -809,13 +810,51 @@ function timeAgo(dateStr: string): string {
   return `hace ${days}d`;
 }
 
+function agingHours(dateStr: string): number {
+  return (Date.now() - new Date(dateStr).getTime()) / 3600000;
+}
+
+function exportCsv(orders: Order[]) {
+  const headers = ["ID", "Nombre", "Producto", "Detalles", "Contacto", "Estado", "Notas", "Fecha"];
+  const rows = orders.map((o) => [
+    o.id, o.name, o.product,
+    `"${o.details.replace(/"/g, '""')}"`,
+    o.contact,
+    STATUS_LABELS[o.status]?.label ?? o.status,
+    `"${o.notes.replace(/"/g, '""')}"`,
+    new Date(o.createdAt).toLocaleString("es-ES"),
+  ]);
+  const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = `encargos-poisow3d-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+/* Toast system */
+type ToastMsg = { id: number; msg: string; type: "ok" | "err" };
+let toastId = 0;
+
 function AdminPage() {
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loadingOrders, setLoadingOrders] = useState(false);
-  const [filter, setFilter] = useState<string>("all");
+  const [isAdmin, setIsAdmin]         = useState<boolean | null>(null);
+  const [password, setPassword]       = useState("");
+  const [loginError, setLoginError]   = useState("");
+  const [orders, setOrders]           = useState<Order[]>([]);
+  const [loading, setLoading]         = useState(false);
+  const [filter, setFilter]           = useState<string>("all");
+  const [search, setSearch]           = useState("");
+  const [expandedId, setExpandedId]   = useState<number | null>(null);
+  const [noteMap, setNoteMap]         = useState<Record<number,string>>({});
+  const [savingNote, setSavingNote]   = useState<number | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [copiedId, setCopiedId]       = useState<number | null>(null);
+  const [toasts, setToasts]           = useState<ToastMsg[]>([]);
+
+  const toast = (msg: string, type: "ok" | "err" = "ok") => {
+    const id = ++toastId;
+    setToasts((p) => [...p, { id, msg, type }]);
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3000);
+  };
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
@@ -824,95 +863,85 @@ function AdminPage() {
       .catch(() => setIsAdmin(false));
   }, []);
 
-  useEffect(() => {
-    if (isAdmin) loadOrders();
-  }, [isAdmin]);
+  useEffect(() => { if (isAdmin) loadOrders(); }, [isAdmin]);
 
   const loadOrders = async () => {
-    setLoadingOrders(true);
+    setLoading(true);
     try {
       const r = await fetch("/api/orders", { credentials: "include" });
-      if (r.ok) setOrders(await r.json() as Order[]);
-    } finally {
-      setLoadingOrders(false);
-    }
+      if (r.ok) {
+        const data = await r.json() as Order[];
+        setOrders(data);
+        const notes: Record<number,string> = {};
+        data.forEach((o) => { notes[o.id] = o.notes; });
+        setNoteMap(notes);
+      }
+    } finally { setLoading(false); }
   };
 
   const login = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError("");
-    const r = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ password }),
-    });
+    e.preventDefault(); setLoginError("");
+    const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ password }) });
     if (r.ok) { setIsAdmin(true); } else { setLoginError("Contraseña incorrecta"); }
   };
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    setIsAdmin(false);
-    setOrders([]);
+    setIsAdmin(false); setOrders([]);
   };
 
   const updateStatus = async (id: number, status: string) => {
-    const r = await fetch(`/api/orders/${id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ status }),
-    });
-    if (r.ok) setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+    const r = await fetch(`/api/orders/${id}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ status }) });
+    if (r.ok) { setOrders((p) => p.map((o) => o.id === id ? { ...o, status } : o)); toast(`Estado → ${STATUS_LABELS[status]?.label ?? status}`); }
+    else toast("Error al cambiar estado", "err");
   };
 
-  if (isAdmin === null) {
-    return (
-      <div className="min-h-screen bg-background text-foreground dark flex items-center justify-center">
-        <div className="flex items-center gap-3 font-mono text-muted-foreground">
-          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          Cargando...
-        </div>
-      </div>
-    );
-  }
+  const saveNote = async (id: number) => {
+    setSavingNote(id);
+    const r = await fetch(`/api/orders/${id}/note`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ notes: noteMap[id] ?? "" }) });
+    setSavingNote(null);
+    if (r.ok) { setOrders((p) => p.map((o) => o.id === id ? { ...o, notes: noteMap[id] ?? "" } : o)); toast("Nota guardada"); }
+    else toast("Error al guardar nota", "err");
+  };
 
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background text-foreground dark flex items-center justify-center p-6">
-        <div className="w-full max-w-sm">
-          <div className="flex items-center gap-2.5 font-mono text-xl font-bold mb-2">
-            <LogoMark size={26} />
-            poisow 3d
-          </div>
-          <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest mb-8">Panel de administración</p>
-          <div className="h-px bg-muted mb-8" />
-          <form onSubmit={login} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Contraseña</Label>
-              <Input
-                type="password"
-                className="rounded-none border-muted bg-card font-mono h-11"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoFocus
-                required
-              />
-            </div>
-            {loginError && (
-              <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-red-400 font-mono">
-                {loginError}
-              </motion.p>
-            )}
-            <Button type="submit" className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none h-11">
-              Entrar <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
-          </form>
-        </div>
+  const deleteOrder = async (id: number) => {
+    const r = await fetch(`/api/orders/${id}`, { method: "DELETE", credentials: "include" });
+    if (r.ok) { setOrders((p) => p.filter((o) => o.id !== id)); setDeleteConfirm(null); toast("Encargo eliminado"); }
+    else toast("Error al eliminar", "err");
+  };
+
+  const copyContact = (id: number, contact: string) => {
+    navigator.clipboard.writeText(contact).then(() => {
+      setCopiedId(id); setTimeout(() => setCopiedId(null), 2000); toast("Contacto copiado");
+    });
+  };
+
+  if (isAdmin === null) return (
+    <div className="min-h-screen bg-background text-foreground dark flex items-center justify-center">
+      <div className="flex items-center gap-3 font-mono text-muted-foreground">
+        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        Cargando...
       </div>
-    );
-  }
+    </div>
+  );
+
+  if (!isAdmin) return (
+    <div className="min-h-screen bg-background text-foreground dark flex items-center justify-center p-6">
+      <div className="w-full max-w-sm">
+        <div className="flex items-center gap-2.5 font-mono text-xl font-bold mb-1"><LogoMark size={26} />poisow 3d</div>
+        <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest mb-8">Panel de administración</p>
+        <div className="h-px bg-muted mb-8" />
+        <form onSubmit={login} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Contraseña</Label>
+            <Input type="password" className="rounded-none border-muted bg-card font-mono h-11" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus required />
+          </div>
+          {loginError && <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-red-400 font-mono">{loginError}</motion.p>}
+          <Button type="submit" className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none h-11">Entrar <ArrowRight className="ml-2 w-4 h-4" /></Button>
+        </form>
+      </div>
+    </div>
+  );
 
   const counts = {
     all: orders.length,
@@ -921,138 +950,224 @@ function AdminPage() {
     done: orders.filter((o) => o.status === "done").length,
   };
 
-  const filtered = filter === "all" ? orders : orders.filter((o) => o.status === filter);
+  const q = search.toLowerCase();
+  const filtered = orders
+    .filter((o) => filter === "all" || o.status === filter)
+    .filter((o) => !q || o.name.toLowerCase().includes(q) || o.product.toLowerCase().includes(q) || o.contact.toLowerCase().includes(q) || o.details.toLowerCase().includes(q));
 
   return (
     <div className="min-h-screen bg-background text-foreground dark">
+      {/* Toast stack */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+        {toasts.map((t) => (
+          <motion.div key={t.id} initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }}
+            className={`font-mono text-xs px-4 py-2.5 border flex items-center gap-2 shadow-lg pointer-events-auto ${t.type === "ok" ? "bg-card border-secondary/40 text-secondary" : "bg-card border-red-400/40 text-red-400"}`}>
+            {t.type === "ok" ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <X className="w-3.5 h-3.5 shrink-0" />}
+            {t.msg}
+          </motion.div>
+        ))}
+      </div>
+
       {/* Top nav */}
-      <nav className="border-b border-muted bg-card/80 backdrop-blur-sm sticky top-0 z-40 px-6 h-14 flex items-center justify-between">
+      <nav className="border-b border-muted bg-card/90 backdrop-blur-sm sticky top-0 z-40 px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2.5 font-mono text-sm font-bold">
           <LogoMark size={20} />
-          poisow 3d <span className="text-muted-foreground font-normal">/ admin</span>
+          poisow 3d <span className="text-muted-foreground font-normal mx-1">/</span> <span className="text-muted-foreground font-normal">admin</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="font-mono rounded-none text-muted-foreground hover:text-foreground h-8 px-3 text-xs" onClick={loadOrders}>
-            ↻ Actualizar
-          </Button>
-          <div className="w-px h-4 bg-muted" />
-          <Button variant="ghost" size="sm" className="font-mono rounded-none text-muted-foreground hover:text-foreground h-8 px-3 text-xs" onClick={logout}>
-            Salir
-          </Button>
+        <div className="flex items-center gap-1">
+          <button onClick={() => exportCsv(orders)} className="font-mono text-xs px-3 py-1.5 border border-muted text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-all flex items-center gap-1.5 rounded-none">
+            <Download className="w-3.5 h-3.5" /> CSV
+          </button>
+          <button onClick={loadOrders} className="font-mono text-xs px-3 py-1.5 border border-transparent text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5 rounded-none ml-1">
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+          <div className="w-px h-4 bg-muted mx-1" />
+          <button onClick={logout} className="font-mono text-xs px-3 py-1.5 border border-transparent text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5 rounded-none">
+            <LogOut className="w-3.5 h-3.5" /> Salir
+          </button>
         </div>
       </nav>
 
       <div className="max-w-5xl mx-auto px-6 py-8">
 
-        {/* Stats */}
+        {/* Stats cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-          {[
-            { key: "all",         label: "Total",      count: counts.all,         color: "text-foreground",   bg: "bg-card" },
-            { key: "pending",     label: "Pendientes", count: counts.pending,     color: "text-yellow-400",   bg: "bg-yellow-400/5" },
-            { key: "in_progress", label: "En proceso", count: counts.in_progress, color: "text-blue-400",     bg: "bg-blue-400/5" },
-            { key: "done",        label: "Listos",     count: counts.done,        color: "text-secondary",    bg: "bg-secondary/5" },
-          ].map((s) => (
-            <button
-              key={s.key}
-              onClick={() => setFilter(s.key)}
-              className={`text-left p-4 border transition-all rounded-none ${
-                filter === s.key ? "border-primary bg-primary/5" : "border-muted " + s.bg + " hover:border-muted-foreground/40"
-              }`}
-            >
-              <p className={`font-mono text-3xl font-black mb-0.5 ${s.color}`}>{s.count}</p>
+          {([
+            { key: "all",         label: "Total",      color: "text-foreground",  bg: "border-muted" },
+            { key: "pending",     label: "Pendientes", color: "text-yellow-400",  bg: "border-yellow-400/20" },
+            { key: "in_progress", label: "En proceso", color: "text-blue-400",    bg: "border-blue-400/20" },
+            { key: "done",        label: "Listos",     color: "text-secondary",   bg: "border-secondary/20" },
+          ] as const).map((s) => (
+            <button key={s.key} onClick={() => setFilter(s.key)}
+              className={`text-left p-4 border-2 transition-all rounded-none bg-card ${filter === s.key ? "border-primary" : s.bg + " hover:border-muted-foreground/30"}`}>
+              <p className={`font-mono text-4xl font-black mb-1 ${s.color}`}>{counts[s.key]}</p>
               <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest">{s.label}</p>
-            </button>
-          ))}
-        </div>
-
-        {/* Filter tabs */}
-        <div className="flex items-center gap-1 mb-6 border-b border-muted pb-0">
-          {[
-            { key: "all", label: "Todos" },
-            { key: "pending", label: "Pendientes" },
-            { key: "in_progress", label: "En proceso" },
-            { key: "done", label: "Listos" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setFilter(tab.key)}
-              className={`font-mono text-xs px-4 py-2.5 transition-colors border-b-2 -mb-px ${
-                filter === tab.key
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              {tab.key !== "all" && counts[tab.key as keyof typeof counts] > 0 && (
-                <span className="ml-1.5 font-mono text-xs opacity-60">{counts[tab.key as keyof typeof counts]}</span>
+              {s.key === "pending" && counts.pending > 0 && (
+                <p className="font-mono text-xs text-yellow-400/70 mt-1">requieren acción</p>
               )}
             </button>
           ))}
         </div>
 
-        {/* Orders list */}
-        {loadingOrders ? (
-          <div className="flex flex-col gap-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="border border-muted bg-card h-32 animate-pulse" />
+        {/* Search + filter bar */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text" placeholder="Buscar por nombre, producto, contacto..." value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-10 pl-9 pr-4 bg-card border border-muted font-mono text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 rounded-none"
+            />
+            {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
+          </div>
+          <div className="flex border border-muted rounded-none overflow-hidden">
+            {[
+              { key: "all", label: "Todos" },
+              { key: "pending", label: "Pendiente" },
+              { key: "in_progress", label: "Proceso" },
+              { key: "done", label: "Listo" },
+            ].map((tab) => (
+              <button key={tab.key} onClick={() => setFilter(tab.key)}
+                className={`font-mono text-xs px-3 py-2 transition-colors border-r border-muted last:border-r-0 ${filter === tab.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/30"}`}>
+                {tab.label}
+              </button>
             ))}
           </div>
+        </div>
+
+        {/* Result count */}
+        <p className="font-mono text-xs text-muted-foreground/50 mb-4">
+          {filtered.length} encargo{filtered.length !== 1 ? "s" : ""}{search ? ` · búsqueda: "${search}"` : ""}
+        </p>
+
+        {/* List */}
+        {loading ? (
+          <div className="flex flex-col gap-3">
+            {[1,2,3].map((i) => <div key={i} className="h-28 border border-muted bg-card animate-pulse" />)}
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="border border-dashed border-muted p-16 text-center">
-            <p className="font-mono text-muted-foreground text-sm">
-              {filter === "all" ? "Todavía no hay encargos." : `No hay encargos con estado "${STATUS_LABELS[filter]?.label ?? filter}".`}
-            </p>
+          <div className="border border-dashed border-muted p-20 text-center">
+            <p className="font-mono text-muted-foreground text-sm">{search ? `Sin resultados para "${search}".` : "No hay encargos aquí todavía."}</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             {filtered.map((order) => {
               const s = STATUS_LABELS[order.status] ?? STATUS_LABELS["pending"]!;
+              const hours = agingHours(order.createdAt);
+              const isOld = order.status === "pending" && hours > 24;
+              const isVeryOld = order.status === "pending" && hours > 72;
+              const isExpanded = expandedId === order.id;
+              const isDeleteConfirm = deleteConfirm === order.id;
+
               return (
-                <motion.div
-                  key={order.id}
-                  layout
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`border border-muted border-l-4 ${s.border} bg-card flex flex-col sm:flex-row`}
-                >
-                  {/* Main info */}
-                  <div className="flex-1 min-w-0 p-5">
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span className="font-mono text-xs text-muted-foreground/50">#{order.id}</span>
-                      <span className="font-mono text-sm font-bold">{order.name}</span>
-                      <Badge variant="outline" className={`font-mono text-xs rounded-none px-2 py-0 h-5 ${s.badge}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 inline-block ${s.dot}`} />
-                        {s.label}
-                      </Badge>
-                      <span className="font-mono text-xs text-muted-foreground/40 ml-auto">{timeAgo(order.createdAt)}</span>
+                <motion.div key={order.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                  className={`border bg-card border-l-4 ${s.border} ${isVeryOld ? "border-red-400/40" : isOld ? "border-yellow-400/30" : "border-muted"}`}>
+
+                  {/* Main row */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-0">
+                    <div className="flex-1 min-w-0 p-4 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : order.id)}>
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="font-mono text-xs text-muted-foreground/40">#{order.id}</span>
+                        <span className="font-mono text-sm font-bold">{order.name}</span>
+                        <Badge variant="outline" className={`font-mono text-xs rounded-none px-2 py-0 h-5 ${s.badge}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full mr-1.5 inline-block ${s.dot}`} />
+                          {s.label}
+                        </Badge>
+                        {isVeryOld && <span className="flex items-center gap-1 font-mono text-xs text-red-400"><Flame className="w-3 h-3" />urgente</span>}
+                        {isOld && !isVeryOld && <span className="flex items-center gap-1 font-mono text-xs text-yellow-400/80"><AlertTriangle className="w-3 h-3" />pendiente +24h</span>}
+                        {order.notes && <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground/50"><StickyNote className="w-3 h-3" />nota</span>}
+                        <span className="font-mono text-xs text-muted-foreground/30 ml-auto">{timeAgo(order.createdAt)}</span>
+                      </div>
+                      <p className="font-mono text-sm font-bold text-foreground mb-1">{order.product}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{order.details}</p>
                     </div>
 
-                    <p className="font-mono text-base font-bold text-foreground mb-1.5">{order.product}</p>
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-3 max-w-xl">{order.details}</p>
+                    {/* Right actions */}
+                    <div className="flex items-center gap-1 px-3 py-2 sm:border-l border-t sm:border-t-0 border-muted/50 shrink-0 bg-card/50">
+                      {/* Status pills */}
+                      <div className="flex flex-col gap-1 mr-2">
+                        {STATUS_KEYS.map((key) => (
+                          <button key={key} onClick={() => updateStatus(order.id, key)} disabled={order.status === key}
+                            className={`font-mono text-xs px-2.5 py-1 transition-all border rounded-none w-24 text-center ${order.status === key ? STATUS_LABELS[key].badge + " cursor-default" : "border-muted text-muted-foreground hover:border-foreground/30 hover:text-foreground"}`}>
+                            {STATUS_LABELS[key].label}
+                          </button>
+                        ))}
+                      </div>
 
-                    <div className="flex items-center gap-1.5 font-mono text-xs">
-                      <span className="text-muted-foreground/50">Contacto:</span>
-                      <span className="text-primary font-semibold">{order.contact}</span>
+                      <div className="flex flex-col gap-1">
+                        {/* Copy contact */}
+                        <button onClick={() => copyContact(order.id, order.contact)} title="Copiar contacto"
+                          className="w-8 h-8 flex items-center justify-center border border-muted text-muted-foreground hover:text-primary hover:border-primary/40 transition-all rounded-none">
+                          {copiedId === order.id ? <CheckCircle2 className="w-3.5 h-3.5 text-secondary" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                        {/* Notes toggle */}
+                        <button onClick={() => setExpandedId(isExpanded ? null : order.id)} title="Ver detalles y notas"
+                          className={`w-8 h-8 flex items-center justify-center border transition-all rounded-none ${isExpanded ? "border-primary text-primary bg-primary/10" : "border-muted text-muted-foreground hover:text-foreground hover:border-foreground/30"}`}>
+                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+                        {/* Delete */}
+                        {!isDeleteConfirm ? (
+                          <button onClick={() => setDeleteConfirm(order.id)} title="Eliminar encargo"
+                            className="w-8 h-8 flex items-center justify-center border border-muted text-muted-foreground hover:text-red-400 hover:border-red-400/40 transition-all rounded-none">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <div className="flex gap-1">
+                            <button onClick={() => deleteOrder(order.id)} className="w-8 h-8 flex items-center justify-center border border-red-400/50 text-red-400 hover:bg-red-400/10 transition-all rounded-none">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setDeleteConfirm(null)} className="w-8 h-8 flex items-center justify-center border border-muted text-muted-foreground hover:text-foreground transition-all rounded-none">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Status actions */}
-                  <div className="flex sm:flex-col gap-1 p-3 sm:border-l border-t sm:border-t-0 border-muted bg-background/30 justify-end sm:justify-start">
-                    {STATUS_KEYS.map((key) => (
-                      <button
-                        key={key}
-                        onClick={() => updateStatus(order.id, key)}
-                        disabled={order.status === key}
-                        className={`font-mono text-xs px-3 py-1.5 transition-all border rounded-none ${
-                          order.status === key
-                            ? `${STATUS_LABELS[key].badge} cursor-default`
-                            : "border-muted text-muted-foreground hover:border-foreground/40 hover:text-foreground"
-                        }`}
-                      >
-                        {STATUS_LABELS[key].label}
-                      </button>
-                    ))}
-                  </div>
+                  {/* Expanded panel */}
+                  {isExpanded && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                      className="border-t border-muted bg-background/40">
+                      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Full details */}
+                        <div>
+                          <p className="font-mono text-xs text-muted-foreground/50 uppercase tracking-widest mb-2">Detalles completos</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-4">{order.details}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-mono text-xs text-muted-foreground/50">Contacto:</p>
+                            <span className="font-mono text-sm text-primary font-semibold">{order.contact}</span>
+                            <button onClick={() => copyContact(order.id, order.contact)} className="text-muted-foreground hover:text-primary transition-colors">
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <p className="font-mono text-xs text-muted-foreground/30 mt-2">
+                            {new Date(order.createdAt).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                          <p className="font-mono text-xs text-muted-foreground/50 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                            <StickyNote className="w-3 h-3" /> Notas internas
+                          </p>
+                          <Textarea
+                            value={noteMap[order.id] ?? ""}
+                            onChange={(e) => setNoteMap((p) => ({ ...p, [order.id]: e.target.value }))}
+                            placeholder="Precio acordado, plazo estimado, comentarios internos..."
+                            className="rounded-none border-muted bg-card font-mono text-xs min-h-[80px] resize-none text-foreground"
+                          />
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="font-mono text-xs text-muted-foreground/40">Solo visible para ti</span>
+                            <button onClick={() => saveNote(order.id)} disabled={savingNote === order.id}
+                              className="font-mono text-xs px-3 py-1.5 border border-muted text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-all disabled:opacity-50 rounded-none flex items-center gap-1.5">
+                              {savingNote === order.id ? <><div className="w-3 h-3 border border-t-transparent border-foreground rounded-full animate-spin" />Guardando...</> : <>Guardar nota</>}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
                 </motion.div>
               );
             })}

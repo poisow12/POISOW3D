@@ -9,6 +9,7 @@ export const ordersTable = pgTable("orders", {
   details: text("details").notNull(),
   contact: text("contact").notNull(),
   status: text("status").notNull().default("pending"),
+  notes: text("notes").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -16,6 +17,7 @@ export const insertOrderSchema = createInsertSchema(ordersTable).omit({
   id: true,
   createdAt: true,
   status: true,
+  notes: true,
 });
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;

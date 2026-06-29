@@ -46,14 +46,7 @@ router.post("/orders", async (req, res): Promise<void> => {
   const [order] = await db.insert(ordersTable).values(parsed.data).returning();
   req.log.info({ orderId: order.id }, "New order created");
   res.status(201).json({ id: order.id });
-
-  // Fire-and-forget notification (after response is sent)
-  void notifyNewOrder({
-    id: order.id,
-    name: order.name,
-    product: order.product,
-    contact: order.contact,
-  });
+  void notifyNewOrder({ id: order.id, name: order.name, product: order.product, contact: order.contact });
 });
 
 router.get("/orders", requireAdmin, async (req, res): Promise<void> => {
@@ -62,23 +55,34 @@ router.get("/orders", requireAdmin, async (req, res): Promise<void> => {
 });
 
 router.patch("/orders/:id/status", requireAdmin, async (req, res): Promise<void> => {
-  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const id = parseInt(rawId, 10);
-  if (isNaN(id)) {
-    res.status(400).json({ error: "ID inválido" });
-    return;
-  }
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
   const { status } = req.body as { status?: string };
   if (!status || !["pending", "in_progress", "done"].includes(status)) {
-    res.status(400).json({ error: "Estado inválido" });
-    return;
+    res.status(400).json({ error: "Estado inválido" }); return;
   }
   const [updated] = await db.update(ordersTable).set({ status }).where(eq(ordersTable.id, id)).returning();
-  if (!updated) {
-    res.status(404).json({ error: "Encargo no encontrado" });
-    return;
-  }
+  if (!updated) { res.status(404).json({ error: "No encontrado" }); return; }
   res.json(updated);
+});
+
+router.patch("/orders/:id/note", requireAdmin, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+  const { notes } = req.body as { notes?: string };
+  if (notes === undefined) { res.status(400).json({ error: "Campo notes requerido" }); return; }
+  const [updated] = await db.update(ordersTable).set({ notes }).where(eq(ordersTable.id, id)).returning();
+  if (!updated) { res.status(404).json({ error: "No encontrado" }); return; }
+  res.json(updated);
+});
+
+router.delete("/orders/:id", requireAdmin, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+  const [deleted] = await db.delete(ordersTable).where(eq(ordersTable.id, id)).returning();
+  if (!deleted) { res.status(404).json({ error: "No encontrado" }); return; }
+  req.log.info({ orderId: id }, "Order deleted");
+  res.json({ ok: true });
 });
 
 export default router;
