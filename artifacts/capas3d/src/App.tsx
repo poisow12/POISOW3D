@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const queryClient = new QueryClient();
 const INSTAGRAM_URL = "https://www.instagram.com/poisow3d/";
@@ -253,11 +254,30 @@ function OrderModal({ open, onClose, productName = "" }: OrderModalProps) {
     setSent(false);
   }, [productName, open]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const body = `Hola! Me llamo ${name} y quiero encargar: ${product}.\n\nDetalles: ${details}\n\nContacto: ${contact}`;
-    window.open(`mailto:poisow3d@gmail.com?subject=${encodeURIComponent(`Encargo poisow 3d — ${product}`)}&body=${encodeURIComponent(body)}`, "_blank");
-    setSent(true);
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name, product, details, contact }),
+      });
+      if (res.ok) {
+        setSent(true);
+      } else {
+        setError("Error al enviar el encargo. Por favor intenta de nuevo.");
+      }
+    } catch {
+      setError("Error de conexión. Por favor intenta de nuevo.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -280,9 +300,9 @@ function OrderModal({ open, onClose, productName = "" }: OrderModalProps) {
               <div className="w-16 h-16 border-2 border-primary flex items-center justify-center">
                 <CheckCircle2 className="w-8 h-8 text-primary" />
               </div>
-              <h3 className="font-mono text-xl font-bold">Encargo enviado</h3>
+              <h3 className="font-mono text-xl font-bold">¡Encargo recibido!</h3>
               <p className="text-muted-foreground text-sm max-w-xs">
-                Se ha abierto tu cliente de correo. Te respondo en menos de 24 horas.
+                Ya tengo tu encargo. Te respondo con precio y plazo en menos de 24 horas.
               </p>
               <Button variant="outline" className="font-mono rounded-none border-muted mt-2" onClick={onClose}>Cerrar</Button>
             </motion.div>
@@ -306,8 +326,9 @@ function OrderModal({ open, onClose, productName = "" }: OrderModalProps) {
                 <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">¿Cómo te contacto?</Label>
                 <Input data-testid="input-order-contact" className="rounded-none border-muted bg-background font-mono" placeholder="tu@email.com o @tuinstagram" value={contact} onChange={(e) => setContact(e.target.value)} required />
               </div>
-              <Button data-testid="button-order-submit" type="submit" size="lg" className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none mt-2 h-12">
-                Enviar encargo <ArrowRight className="ml-2 w-4 h-4" />
+              {error && <p className="text-xs text-red-400 font-mono text-center">{error}</p>}
+              <Button data-testid="button-order-submit" type="submit" size="lg" disabled={submitting} className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none mt-2 h-12">
+                {submitting ? "Enviando..." : <><span>Enviar encargo</span><ArrowRight className="ml-2 w-4 h-4" /></>}
               </Button>
               <p className="text-xs text-muted-foreground/60 text-center font-mono">Respuesta garantizada en menos de 24h</p>
             </form>
@@ -722,6 +743,232 @@ function Materials() {
   );
 }
 
+/* ─── FAQ ────────────────────────────────────────────────────────────────── */
+const FAQ_ITEMS = [
+  { q: "¿Cuánto tarda un encargo?", a: "Depende del tamaño y la complejidad. Piezas pequeñas o medianas suelen estar listas en 2–5 días. Te doy un plazo concreto cuando confirmo el encargo, antes de imprimir nada." },
+  { q: "¿Puedo enviar mi propio fichero STL?", a: "Sí, perfectamente. Si tienes el fichero listo, solo tienes que enviármelo junto con el material y el acabado que quieres. Si hay algún problema con el diseño, te aviso antes de empezar." },
+  { q: "¿Cuánto cuesta?", a: "El precio depende del material, el tiempo de impresión y el acabado. Manda tu idea y te doy un presupuesto cerrado — sin sorpresas ni costes extra al final." },
+  { q: "¿Hacéis envíos fuera de Bilbao?", a: "Sí. Hago envíos a toda España. Si estás en Bilbao también puedes recogerlo en mano y nos ahorramos el envío." },
+  { q: "¿Qué materiales usáis?", a: "Trabajo principalmente con PLA, PETG, TPU y ABS. Si no sabes cuál elegir, cuéntame para qué es la pieza y te recomiendo el que mejor le va." },
+  { q: "¿Qué pasa si la pieza sale mal?", a: "Si el resultado no cumple lo que acordamos, la vuelvo a imprimir sin coste adicional. La calidad es mi responsabilidad." },
+];
+
+function FaqSection() {
+  return (
+    <section id="faq" className="py-24 px-6 max-w-6xl mx-auto">
+      <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-4">
+        <p className="font-mono text-xs text-secondary uppercase tracking-widest mb-2">Dudas frecuentes</p>
+        <h2 className="font-mono text-3xl font-bold tracking-tight">FAQ<span className="text-secondary">_</span></h2>
+      </motion.div>
+      <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-muted-foreground mb-12 max-w-xl">
+        Si tu pregunta no está aquí, escríbeme directamente.
+      </motion.p>
+      <Accordion type="single" collapsible className="w-full max-w-3xl space-y-0">
+        {FAQ_ITEMS.map((item, i) => (
+          <AccordionItem key={i} value={`faq-${i}`} className="border-b border-muted">
+            <AccordionTrigger className="font-mono text-sm font-semibold text-left hover:text-primary hover:no-underline py-5">
+              {item.q}
+            </AccordionTrigger>
+            <AccordionContent className="font-mono text-sm text-muted-foreground leading-relaxed pb-5">
+              {item.a}
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </section>
+  );
+}
+
+/* ─── Admin Page ─────────────────────────────────────────────────────────── */
+type Order = {
+  id: number;
+  name: string;
+  product: string;
+  details: string;
+  contact: string;
+  status: string;
+  createdAt: string;
+};
+
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  pending: { label: "Pendiente", color: "text-yellow-400 border-yellow-400/30 bg-yellow-400/10" },
+  in_progress: { label: "En proceso", color: "text-blue-400 border-blue-400/30 bg-blue-400/10" },
+  done: { label: "Listo", color: "text-secondary border-secondary/30 bg-secondary/10" },
+};
+
+function AdminPage() {
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d: { isAdmin: boolean }) => setIsAdmin(d.isAdmin))
+      .catch(() => setIsAdmin(false));
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin) loadOrders();
+  }, [isAdmin]);
+
+  const loadOrders = async () => {
+    setLoadingOrders(true);
+    try {
+      const r = await fetch("/api/orders", { credentials: "include" });
+      if (r.ok) setOrders(await r.json() as Order[]);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const login = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    const r = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ password }),
+    });
+    if (r.ok) {
+      setIsAdmin(true);
+    } else {
+      setLoginError("Contraseña incorrecta");
+    }
+  };
+
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    setIsAdmin(false);
+    setOrders([]);
+  };
+
+  const updateStatus = async (id: number, status: string) => {
+    const r = await fetch(`/api/orders/${id}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ status }),
+    });
+    if (r.ok) {
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+    }
+  };
+
+  if (isAdmin === null) {
+    return (
+      <div className="min-h-screen bg-background text-foreground dark flex items-center justify-center font-mono">
+        Cargando...
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background text-foreground dark flex items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          <div className="flex items-center gap-2.5 font-mono text-xl font-bold mb-8">
+            <LogoMark size={26} />
+            poisow 3d · admin
+          </div>
+          <form onSubmit={login} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Contraseña</Label>
+              <Input
+                type="password"
+                className="rounded-none border-muted bg-card font-mono"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            {loginError && <p className="text-xs text-red-400 font-mono">{loginError}</p>}
+            <Button type="submit" className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none h-11">
+              Entrar
+            </Button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background text-foreground dark">
+      <nav className="border-b border-muted bg-card px-6 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 font-mono text-base font-bold">
+          <LogoMark size={22} />
+          poisow 3d · admin
+        </div>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" className="font-mono rounded-none text-muted-foreground" onClick={loadOrders}>
+            Actualizar
+          </Button>
+          <Button variant="outline" size="sm" className="font-mono rounded-none border-muted" onClick={logout}>
+            Cerrar sesión
+          </Button>
+        </div>
+      </nav>
+
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        <div className="flex items-baseline gap-4 mb-8">
+          <h1 className="font-mono text-2xl font-bold">Encargos</h1>
+          <span className="font-mono text-muted-foreground text-sm">{orders.length} en total</span>
+        </div>
+
+        {loadingOrders ? (
+          <p className="font-mono text-muted-foreground">Cargando encargos...</p>
+        ) : orders.length === 0 ? (
+          <div className="border border-dashed border-muted rounded-none p-16 text-center">
+            <p className="font-mono text-muted-foreground">Todavía no hay encargos.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {orders.map((order) => {
+              const s = STATUS_LABELS[order.status] ?? STATUS_LABELS["pending"];
+              return (
+                <div key={order.id} className="border border-muted bg-card p-6 flex flex-col md:flex-row md:items-start gap-6">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-3 flex-wrap">
+                      <span className="font-mono text-xs text-muted-foreground">#{order.id}</span>
+                      <h3 className="font-mono font-bold text-sm">{order.name}</h3>
+                      <Badge variant="outline" className={`font-mono text-xs rounded-none ${s.color}`}>{s.label}</Badge>
+                    </div>
+                    <p className="font-mono text-sm font-semibold text-primary mb-1">{order.product}</p>
+                    <p className="text-sm text-muted-foreground mb-2 leading-relaxed">{order.details}</p>
+                    <p className="font-mono text-xs text-muted-foreground/60">
+                      Contacto: <span className="text-muted-foreground">{order.contact}</span>
+                      {" · "}
+                      {new Date(order.createdAt).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <div className="flex flex-row md:flex-col gap-2 shrink-0">
+                    {["pending", "in_progress", "done"].map((s) => (
+                      <Button
+                        key={s}
+                        size="sm"
+                        variant={order.status === s ? "default" : "outline"}
+                        className={`font-mono rounded-none text-xs h-8 ${order.status === s ? "bg-primary text-primary-foreground" : "border-muted text-muted-foreground"}`}
+                        onClick={() => updateStatus(order.id, s)}
+                        disabled={order.status === s}
+                      >
+                        {STATUS_LABELS[s]?.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Footer ─────────────────────────────────────────────────────────────── */
 function Footer() {
   return (
@@ -767,6 +1014,7 @@ function Home() {
         <HowItWorks />
         <CustomOrder onOrderClick={() => openOrder()} />
         <Materials />
+        <FaqSection />
       </main>
       <Footer />
       <OrderModal open={modalOpen} onClose={() => setModalOpen(false)} productName={selectedProduct} />
@@ -782,6 +1030,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Switch>
             <Route path="/" component={Home} />
+            <Route path="/admin" component={AdminPage} />
             <Route>
               <div className="min-h-screen flex items-center justify-center font-mono">Página no encontrada_</div>
             </Route>
