@@ -37,108 +37,202 @@ function LogoMark({ size = 28 }: { size?: number }) {
 
 /* ─── Printer Visual ─────────────────────────────────────────────────────── */
 function PrinterVisual() {
+  const [t, setT] = useState(0);
+  const startRef = useRef<number>(0);
+  const frameRef = useRef<number>(0);
+
+  useEffect(() => {
+    startRef.current = performance.now();
+    const loop = (ts: number) => {
+      const LOOP_MS = 11000;
+      setT(((ts - startRef.current) % LOOP_MS) / LOOP_MS);
+      frameRef.current = requestAnimationFrame(loop);
+    };
+    frameRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, []);
+
+  const NUM_LAYERS = 6;
+  const LAYER_H = 11;
+  const PRINT_FRAC = 0.78; // first 78% = printing, rest = show complete + reset
+  const isPrinting = t < PRINT_FRAC;
+
+  const printT = isPrinting ? t / PRINT_FRAC : 1;
+  const totalPhase = printT * NUM_LAYERS;
+  const layerIdx = Math.min(Math.floor(totalPhase), NUM_LAYERS - 1);
+  const layerProg = totalPhase - Math.floor(totalPhase);
+
+  // Printer geometry
+  const POST_L = 30;
+  const POST_R = 330;
+  const FRAME_TOP = 14;
+  const BED_TOP = 238;
+  const PL = 72;   // print area left
+  const PR = 290;  // print area right
+  const PW = PR - PL;
+  const NOZZLE_DROP = 40; // gantry top to nozzle tip
+
+  const goingRight = layerIdx % 2 === 0;
+  const nozzleNorm = goingRight ? layerProg : 1 - layerProg;
+  const nozzleX = isPrinting ? PL + nozzleNorm * PW : PR;
+
+  const layerTopY = (idx: number) => BED_TOP - (idx + 1) * LAYER_H;
+  const currentTopY = layerTopY(layerIdx);
+  const nozzleTipY = isPrinting ? currentTopY : layerTopY(NUM_LAYERS - 1) - 8;
+  const gantryY = nozzleTipY - NOZZLE_DROP;
+
+  const curLayerX = goingRight ? PL : PL + layerProg * PW;
+  const curLayerW = layerProg * PW;
+
+  const layerColor = (i: number) => (i % 2 === 0 ? "#FF5A2A" : "#D94E22");
+  const pct = Math.round(t * 100);
+
   return (
-    <div className="relative w-full flex items-center justify-center py-8 px-4">
-      <svg
-        viewBox="0 0 360 320"
-        fill="none"
-        className="w-full max-w-sm md:max-w-md"
-        style={{ filter: "drop-shadow(0 0 32px rgba(255,90,42,0.12))" }}
-      >
-        {/* Build plate */}
-        <path d="M60 260 L180 300 L300 260 L180 220 Z" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
-        {/* Build plate left face */}
-        <path d="M60 260 L60 268 L180 308 L180 300 Z" fill="#18181B" />
-        {/* Build plate right face */}
-        <path d="M300 260 L300 268 L180 308 L180 300 Z" fill="#27272A" />
+    <div className="relative w-full flex items-center justify-center p-4 md:p-6">
+      <svg viewBox="0 0 360 280" fill="none" className="w-full max-w-[400px]"
+        style={{ filter: "drop-shadow(0 4px 32px rgba(255,90,42,0.13))" }}>
+        <defs>
+          <linearGradient id="postG" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#3F3F46" />
+            <stop offset="100%" stopColor="#27272A" />
+          </linearGradient>
+          <linearGradient id="gantryG" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#52525B" />
+            <stop offset="100%" stopColor="#3F3F46" />
+          </linearGradient>
+          <radialGradient id="nozzleGlowG" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#FF5A2A" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#FF5A2A" stopOpacity="0" />
+          </radialGradient>
+        </defs>
 
-        {/* Printed object - layers stacking up */}
-        {/* Layer 1 - base */}
-        <path d="M110 242 L180 262 L250 242 L180 222 Z" fill="#3F3F46" />
-        <path d="M110 234 L110 242 L180 262 L180 254 Z" fill="#27272A" />
-        <path d="M250 234 L250 242 L180 262 L180 254 Z" fill="#52525B" />
+        {/* ── FRAME ── */}
+        {/* Left post */}
+        <rect x={POST_L} y={FRAME_TOP} width="13" height="240" rx="2" fill="url(#postG)" />
+        <rect x={POST_L + 2} y={FRAME_TOP + 2} width="2" height="236" fill="#52525B" opacity="0.35" />
+        {/* Right post */}
+        <rect x={POST_R - 13} y={FRAME_TOP} width="13" height="240" rx="2" fill="#27272A" />
+        <rect x={POST_R - 5} y={FRAME_TOP + 2} width="2" height="236" fill="#52525B" opacity="0.35" />
+        {/* Top bar */}
+        <rect x={POST_L} y={FRAME_TOP} width={POST_R - POST_L} height="11" rx="2" fill="#3F3F46" />
+        <rect x={POST_L + 3} y={FRAME_TOP + 2} width={POST_R - POST_L - 6} height="4" rx="1" fill="#52525B" opacity="0.45" />
+        {/* Feet */}
+        <rect x={POST_L - 10} y={252} width="44" height="9" rx="2" fill="#27272A" />
+        <rect x={POST_L - 10} y={250} width="44" height="4" rx="1" fill="#3F3F46" />
+        <rect x={POST_R - 34} y={252} width="44" height="9" rx="2" fill="#27272A" />
+        <rect x={POST_R - 34} y={250} width="44" height="4" rx="1" fill="#3F3F46" />
+        {/* Lead screws */}
+        <rect x={POST_L + 5} y={FRAME_TOP + 13} width="3" height="224" fill="#52525B" opacity="0.5" />
+        <rect x={POST_R - 8} y={FRAME_TOP + 13} width="3" height="224" fill="#52525B" opacity="0.5" />
 
-        {/* Layer 2 */}
-        <path d="M118 224 L180 244 L242 224 L180 204 Z" fill="#52525B" />
-        <path d="M118 216 L118 224 L180 244 L180 236 Z" fill="#3F3F46" />
-        <path d="M242 216 L242 224 L180 244 L180 236 Z" fill="#71717A" />
+        {/* ── LCD ── */}
+        <rect x={POST_L + 18} y={FRAME_TOP + 3} width="46" height="28" rx="2" fill="#0C1010" stroke="#3F3F46" strokeWidth="0.5" />
+        <rect x={POST_L + 20} y={FRAME_TOP + 5} width="42" height="24" rx="1" fill="#091209" />
+        <text x={POST_L + 22} y={FRAME_TOP + 14} fontFamily="monospace" fontSize="4.5" fill="#9FD356" letterSpacing="0.5">poisow 3d</text>
+        {/* Progress bar track */}
+        <rect x={POST_L + 21} y={FRAME_TOP + 18} width="38" height="3" rx="1" fill="#1A2A1A" />
+        {/* Progress bar fill */}
+        <rect x={POST_L + 21} y={FRAME_TOP + 18} width={38 * t} height="3" rx="1" fill="#9FD356" />
+        <text x={POST_L + 21} y={FRAME_TOP + 27} fontFamily="monospace" fontSize="4" fill="#3A5A3A">{pct}%</text>
 
-        {/* Layer 3 */}
-        <path d="M126 206 L180 226 L234 206 L180 186 Z" fill="#71717A" />
-        <path d="M126 198 L126 206 L180 226 L180 218 Z" fill="#52525B" />
-        <path d="M234 198 L234 206 L180 226 L180 218 Z" fill="#A1A1AA" />
+        {/* ── FILAMENT SPOOL (top-right corner) ── */}
+        <circle cx={POST_R + 12} cy={FRAME_TOP + 30} r="22" fill="#1C1C1F" stroke="#3F3F46" strokeWidth="1.5" />
+        <circle cx={POST_R + 12} cy={FRAME_TOP + 30} r="9" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
+        <circle cx={POST_R + 12} cy={FRAME_TOP + 30} r="4" fill="#3F3F46" />
+        {/* Filament wound on spool */}
+        <path d={`M${POST_R - 8} ${FRAME_TOP + 28} A22 22 0 0 1 ${POST_R + 12} ${FRAME_TOP + 8}`}
+          stroke="#FF5A2A" strokeWidth="3.5" fill="none" opacity="0.8" />
+        <path d={`M${POST_R - 8} ${FRAME_TOP + 22} A22 22 0 0 1 ${POST_R + 4} ${FRAME_TOP + 9}`}
+          stroke="#CC3A11" strokeWidth="2" fill="none" opacity="0.5" />
 
-        {/* Layer 4 - partial, being printed */}
-        <motion.path
-          d="M134 188 L180 208 L226 188 L180 168 Z"
-          fill="#FF5A2A"
-          opacity={0.9}
-          animate={{ opacity: [0.5, 0.95, 0.5] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.path
-          d="M134 180 L134 188 L180 208 L180 200 Z"
-          fill="#CC4822"
-          animate={{ opacity: [0.5, 0.95, 0.5] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.path
-          d="M226 180 L226 188 L180 208 L180 200 Z"
-          fill="#FF7A54"
-          animate={{ opacity: [0.5, 0.95, 0.5] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        />
+        {/* PTFE tube from spool to carriage */}
+        <path d={`M${POST_R + 2} ${FRAME_TOP + 14} C${nozzleX + 40} ${gantryY - 45} ${nozzleX + 20} ${gantryY - 20} ${nozzleX + 9} ${gantryY + 2}`}
+          stroke="#D4D4D8" strokeWidth="2" strokeDasharray="5 3" opacity="0.3" fill="none" />
 
-        {/* Gantry arm - horizontal beam */}
-        <rect x="40" y="154" width="280" height="8" rx="2" fill="#3F3F46" />
-        <rect x="40" y="154" width="280" height="3" rx="1" fill="#52525B" />
+        {/* ── HEATED BED ── */}
+        {/* Bed carriage */}
+        <rect x="48" y={BED_TOP + 6} width="264" height="9" rx="1" fill="#27272A" />
+        {/* Bed surface (heated) */}
+        <rect x="55" y={BED_TOP - 2} width="250" height="9" rx="1" fill="#3F3F46" />
+        {/* Glass/steel sheet */}
+        <rect x="57" y={BED_TOP - 4} width="246" height="7" rx="0.5" fill="#52525B" />
+        {/* Bed grid */}
+        {[90, 120, 150, 180, 210, 240, 270].map(gx => (
+          <line key={gx} x1={gx} y1={BED_TOP - 4} x2={gx} y2={BED_TOP + 3} stroke="#3F3F46" strokeWidth="0.6" />
+        ))}
+        {/* Bed warm tint */}
+        <rect x="57" y={BED_TOP - 4} width="246" height="7" rx="0.5" fill="#FF2200" opacity="0.05" />
 
-        {/* Gantry vertical posts */}
-        <rect x="36" y="150" width="10" height="80" rx="2" fill="#3F3F46" />
-        <rect x="314" y="150" width="10" height="80" rx="2" fill="#3F3F46" />
+        {/* ── PRINTED OBJECT ── */}
+        {/* Completed layers */}
+        {Array.from({ length: isPrinting ? layerIdx : NUM_LAYERS }, (_, i) => (
+          <g key={i}>
+            <rect x={PL} y={layerTopY(i)} width={PW} height={LAYER_H} fill={layerColor(i)} />
+            <rect x={PL} y={layerTopY(i)} width={PW} height="1.5" fill="white" opacity="0.07" />
+            <rect x={PL} y={layerTopY(i) + LAYER_H - 1} width={PW} height="1" fill="black" opacity="0.18" />
+          </g>
+        ))}
+        {/* Current partial layer */}
+        {isPrinting && curLayerW > 1 && (
+          <g>
+            <rect x={curLayerX} y={currentTopY} width={curLayerW} height={LAYER_H} fill={layerColor(layerIdx)} />
+            <rect x={curLayerX} y={currentTopY} width={curLayerW} height="1.5" fill="white" opacity="0.1" />
+          </g>
+        )}
 
-        {/* Print head carriage */}
-        <motion.g
-          animate={{ x: [-60, 60, 60, -60] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", times: [0, 0.45, 0.55, 1] }}
-        >
-          <rect x="165" y="148" width="30" height="28" rx="3" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
-          <rect x="170" y="148" width="20" height="10" rx="1" fill="#3F3F46" />
-          {/* Nozzle */}
-          <path d="M177 176 L183 176 L181 188 L179 188 Z" fill="#52525B" />
-          {/* Nozzle tip glow */}
-          <motion.circle
-            cx="180" cy="188" r="4" fill="#FF5A2A"
-            style={{ transformBox: "fill-box", transformOrigin: "center" }}
-            animate={{ scale: [0.75, 1.4, 0.75], opacity: [0.8, 1, 0.8] }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+        {/* ── GANTRY / X-AXIS BEAM ── */}
+        <rect x={POST_L + 13} y={gantryY} width={POST_R - POST_L - 26} height="11" rx="1.5" fill="url(#gantryG)" />
+        {/* Rail highlight */}
+        <rect x={POST_L + 13} y={gantryY + 1} width={POST_R - POST_L - 26} height="3.5" rx="0.5" fill="#71717A" opacity="0.4" />
+        {/* Rail groove */}
+        <rect x={POST_L + 13} y={gantryY + 4} width={POST_R - POST_L - 26} height="2" rx="0.5" fill="#18181B" opacity="0.5" />
+
+        {/* ── PRINT CARRIAGE & HOT END ── */}
+        {/* Carriage body */}
+        <rect x={nozzleX - 20} y={gantryY - 5} width="40" height="24" rx="3" fill="#232328" stroke="#3F3F46" strokeWidth="1" />
+        {/* Top grip */}
+        <rect x={nozzleX - 17} y={gantryY - 3} width="34" height="9" rx="2" fill="#3F3F46" />
+        <rect x={nozzleX - 15} y={gantryY - 1} width="30" height="4" rx="1" fill="#52525B" opacity="0.5" />
+        {/* Fan shroud (left side) */}
+        <rect x={nozzleX - 18} y={gantryY + 7} width="15" height="14" rx="2" fill="#141418" stroke="#2A2A30" strokeWidth="0.5" />
+        {/* Fan blade */}
+        <circle cx={nozzleX - 10} cy={gantryY + 14} r="5.5" stroke="#2A2A30" strokeWidth="0.7" fill="none" />
+        <circle cx={nozzleX - 10} cy={gantryY + 14} r="1.8" fill="#1C1C22" />
+        {/* Fan blade spokes */}
+        {[0, 60, 120, 180, 240, 300].map(deg => {
+          const rad = (deg * Math.PI) / 180;
+          return <line key={deg}
+            x1={nozzleX - 10} y1={gantryY + 14}
+            x2={nozzleX - 10 + Math.cos(rad) * 5} y2={gantryY + 14 + Math.sin(rad) * 5}
+            stroke="#2A2A32" strokeWidth="0.8" />;
+        })}
+        {/* Heater block */}
+        <rect x={nozzleX - 5} y={gantryY + 20} width="12" height="10" rx="1.5" fill="#C23000" />
+        <rect x={nozzleX - 4} y={gantryY + 21} width="10" height="8" rx="1" fill="#E03800" opacity="0.7" />
+        <rect x={nozzleX - 3} y={gantryY + 22} width="8" height="6" rx="0.5" fill="#FF5A2A" opacity="0.4" />
+        {/* Heat creep block */}
+        <rect x={nozzleX - 3} y={gantryY + 8} width="8" height="12" rx="1" fill="#27272A" stroke="#3F3F46" strokeWidth="0.5" />
+        {/* Nozzle */}
+        <path d={`M${nozzleX - 3.5} ${gantryY + 30} L${nozzleX + 3.5} ${gantryY + 30} L${nozzleX + 2} ${gantryY + 40} L${nozzleX - 2} ${gantryY + 40} Z`} fill="#71717A" />
+        <path d={`M${nozzleX - 2} ${gantryY + 40} L${nozzleX + 2} ${gantryY + 40} L${nozzleX + 1} ${gantryY + 43} L${nozzleX - 1} ${gantryY + 43} Z`} fill="#A1A1AA" />
+
+        {/* ── NOZZLE GLOW & TIP ── */}
+        {/* Glow halo */}
+        <circle cx={nozzleX} cy={nozzleTipY} r="18" fill="url(#nozzleGlowG)" />
+        {/* Outer ring */}
+        <circle cx={nozzleX} cy={nozzleTipY} r="6" fill="#FF5A2A" opacity="0.18" />
+        {/* Tip */}
+        <circle cx={nozzleX} cy={nozzleTipY} r="3.5" fill="#FF5A2A" opacity="0.95" />
+        <circle cx={nozzleX} cy={nozzleTipY} r="1.5" fill="white" opacity="0.65" />
+
+        {/* Extrusion thread (tiny line from nozzle to layer) */}
+        {isPrinting && curLayerW > 2 && (
+          <line
+            x1={nozzleX} y1={nozzleTipY}
+            x2={nozzleX} y2={currentTopY}
+            stroke="#FF5A2A" strokeWidth="1.8" opacity="0.55"
           />
-          <motion.circle
-            cx="180" cy="188" r="10" fill="#FF5A2A"
-            style={{ transformBox: "fill-box", transformOrigin: "center" }}
-            animate={{ scale: [0.5, 1.1, 0.5], opacity: [0.25, 0.05, 0.25] }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-          />
-        </motion.g>
-
-        {/* Frame top bar */}
-        <rect x="36" y="100" width="288" height="12" rx="3" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
-
-        {/* Frame vertical rails */}
-        <rect x="36" y="100" width="10" height="58" rx="2" fill="#27272A" />
-        <rect x="314" y="100" width="10" height="58" rx="2" fill="#27272A" />
-
-        {/* Small screen/display on frame */}
-        <rect x="60" y="104" width="28" height="18" rx="2" fill="#0F0F10" />
-        <rect x="62" y="106" width="24" height="14" rx="1" fill="#1A2A1A" />
-        <motion.rect
-          x="63" y="107" width="14" height="2" rx="0.5" fill="#9FD356"
-          style={{ transformBox: "fill-box", transformOrigin: "left center" }}
-          animate={{ scaleX: [0.28, 1, 0.28] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <rect x="63" y="111" width="16" height="1.5" rx="0.5" fill="#3F3F46" />
-        <rect x="63" y="115" width="12" height="1.5" rx="0.5" fill="#3F3F46" />
+        )}
       </svg>
     </div>
   );
