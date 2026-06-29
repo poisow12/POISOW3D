@@ -98,9 +98,6 @@ function Hero() {
   return (
     <section className="pt-32 pb-20 md:pt-48 md:pb-32 px-6 max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
       <div className="flex-1 flex flex-col items-start space-y-6">
-        <Badge variant="outline" className="font-mono text-secondary border-secondary bg-secondary/10 rounded-none px-3 py-1">
-          Impreso en Bilbao · A1 Combo
-        </Badge>
         <h1 className="font-mono text-5xl md:text-7xl font-bold tracking-tight leading-tight text-foreground">
           Tu idea,<br/>impresa<br/>capa a capa.
         </h1>
@@ -399,7 +396,6 @@ function Footer() {
           <div className="font-mono text-xl font-bold tracking-tight mb-2">
             capas.3d<span className="text-primary">_</span>
           </div>
-          <p className="text-sm text-muted-foreground">Impreso en Bilbao</p>
         </div>
         <div className="flex items-center gap-6">
           <a href="https://www.instagram.com/capas.3d/" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
