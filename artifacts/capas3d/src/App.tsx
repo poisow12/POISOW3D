@@ -790,11 +790,24 @@ type Order = {
   createdAt: string;
 };
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending: { label: "Pendiente", color: "text-yellow-400 border-yellow-400/30 bg-yellow-400/10" },
-  in_progress: { label: "En proceso", color: "text-blue-400 border-blue-400/30 bg-blue-400/10" },
-  done: { label: "Listo", color: "text-secondary border-secondary/30 bg-secondary/10" },
+const STATUS_LABELS: Record<string, { label: string; badge: string; border: string; dot: string }> = {
+  pending:     { label: "Pendiente",  badge: "text-yellow-400 border-yellow-400/30 bg-yellow-400/10", border: "border-l-yellow-400",  dot: "bg-yellow-400" },
+  in_progress: { label: "En proceso", badge: "text-blue-400 border-blue-400/30 bg-blue-400/10",       border: "border-l-blue-400",    dot: "bg-blue-400"   },
+  done:        { label: "Listo",      badge: "text-secondary border-secondary/30 bg-secondary/10",    border: "border-l-secondary",   dot: "bg-secondary"  },
 };
+
+const STATUS_KEYS = ["pending", "in_progress", "done"] as const;
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "ahora mismo";
+  if (mins < 60) return `hace ${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `hace ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `hace ${days}d`;
+}
 
 function AdminPage() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -802,6 +815,7 @@ function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [filter, setFilter] = useState<string>("all");
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
@@ -833,11 +847,7 @@ function AdminPage() {
       credentials: "include",
       body: JSON.stringify({ password }),
     });
-    if (r.ok) {
-      setIsAdmin(true);
-    } else {
-      setLoginError("Contraseña incorrecta");
-    }
+    if (r.ok) { setIsAdmin(true); } else { setLoginError("Contraseña incorrecta"); }
   };
 
   const logout = async () => {
@@ -853,15 +863,16 @@ function AdminPage() {
       credentials: "include",
       body: JSON.stringify({ status }),
     });
-    if (r.ok) {
-      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
-    }
+    if (r.ok) setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
   };
 
   if (isAdmin === null) {
     return (
-      <div className="min-h-screen bg-background text-foreground dark flex items-center justify-center font-mono">
-        Cargando...
+      <div className="min-h-screen bg-background text-foreground dark flex items-center justify-center">
+        <div className="flex items-center gap-3 font-mono text-muted-foreground">
+          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          Cargando...
+        </div>
       </div>
     );
   }
@@ -870,25 +881,32 @@ function AdminPage() {
     return (
       <div className="min-h-screen bg-background text-foreground dark flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <div className="flex items-center gap-2.5 font-mono text-xl font-bold mb-8">
+          <div className="flex items-center gap-2.5 font-mono text-xl font-bold mb-2">
             <LogoMark size={26} />
-            poisow 3d · admin
+            poisow 3d
           </div>
+          <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest mb-8">Panel de administración</p>
+          <div className="h-px bg-muted mb-8" />
           <form onSubmit={login} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Contraseña</Label>
               <Input
                 type="password"
-                className="rounded-none border-muted bg-card font-mono"
+                className="rounded-none border-muted bg-card font-mono h-11"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoFocus
                 required
               />
             </div>
-            {loginError && <p className="text-xs text-red-400 font-mono">{loginError}</p>}
+            {loginError && (
+              <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-red-400 font-mono">
+                {loginError}
+              </motion.p>
+            )}
             <Button type="submit" className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none h-11">
-              Entrar
+              Entrar <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </form>
         </div>
@@ -896,70 +914,146 @@ function AdminPage() {
     );
   }
 
+  const counts = {
+    all: orders.length,
+    pending: orders.filter((o) => o.status === "pending").length,
+    in_progress: orders.filter((o) => o.status === "in_progress").length,
+    done: orders.filter((o) => o.status === "done").length,
+  };
+
+  const filtered = filter === "all" ? orders : orders.filter((o) => o.status === filter);
+
   return (
     <div className="min-h-screen bg-background text-foreground dark">
-      <nav className="border-b border-muted bg-card px-6 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 font-mono text-base font-bold">
-          <LogoMark size={22} />
-          poisow 3d · admin
+      {/* Top nav */}
+      <nav className="border-b border-muted bg-card/80 backdrop-blur-sm sticky top-0 z-40 px-6 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 font-mono text-sm font-bold">
+          <LogoMark size={20} />
+          poisow 3d <span className="text-muted-foreground font-normal">/ admin</span>
         </div>
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" className="font-mono rounded-none text-muted-foreground" onClick={loadOrders}>
-            Actualizar
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="font-mono rounded-none text-muted-foreground hover:text-foreground h-8 px-3 text-xs" onClick={loadOrders}>
+            ↻ Actualizar
           </Button>
-          <Button variant="outline" size="sm" className="font-mono rounded-none border-muted" onClick={logout}>
-            Cerrar sesión
+          <div className="w-px h-4 bg-muted" />
+          <Button variant="ghost" size="sm" className="font-mono rounded-none text-muted-foreground hover:text-foreground h-8 px-3 text-xs" onClick={logout}>
+            Salir
           </Button>
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <div className="flex items-baseline gap-4 mb-8">
-          <h1 className="font-mono text-2xl font-bold">Encargos</h1>
-          <span className="font-mono text-muted-foreground text-sm">{orders.length} en total</span>
+      <div className="max-w-5xl mx-auto px-6 py-8">
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+          {[
+            { key: "all",         label: "Total",      count: counts.all,         color: "text-foreground",   bg: "bg-card" },
+            { key: "pending",     label: "Pendientes", count: counts.pending,     color: "text-yellow-400",   bg: "bg-yellow-400/5" },
+            { key: "in_progress", label: "En proceso", count: counts.in_progress, color: "text-blue-400",     bg: "bg-blue-400/5" },
+            { key: "done",        label: "Listos",     count: counts.done,        color: "text-secondary",    bg: "bg-secondary/5" },
+          ].map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setFilter(s.key)}
+              className={`text-left p-4 border transition-all rounded-none ${
+                filter === s.key ? "border-primary bg-primary/5" : "border-muted " + s.bg + " hover:border-muted-foreground/40"
+              }`}
+            >
+              <p className={`font-mono text-3xl font-black mb-0.5 ${s.color}`}>{s.count}</p>
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest">{s.label}</p>
+            </button>
+          ))}
         </div>
 
+        {/* Filter tabs */}
+        <div className="flex items-center gap-1 mb-6 border-b border-muted pb-0">
+          {[
+            { key: "all", label: "Todos" },
+            { key: "pending", label: "Pendientes" },
+            { key: "in_progress", label: "En proceso" },
+            { key: "done", label: "Listos" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className={`font-mono text-xs px-4 py-2.5 transition-colors border-b-2 -mb-px ${
+                filter === tab.key
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              {tab.key !== "all" && counts[tab.key as keyof typeof counts] > 0 && (
+                <span className="ml-1.5 font-mono text-xs opacity-60">{counts[tab.key as keyof typeof counts]}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Orders list */}
         {loadingOrders ? (
-          <p className="font-mono text-muted-foreground">Cargando encargos...</p>
-        ) : orders.length === 0 ? (
-          <div className="border border-dashed border-muted rounded-none p-16 text-center">
-            <p className="font-mono text-muted-foreground">Todavía no hay encargos.</p>
+          <div className="flex flex-col gap-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="border border-muted bg-card h-32 animate-pulse" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="border border-dashed border-muted p-16 text-center">
+            <p className="font-mono text-muted-foreground text-sm">
+              {filter === "all" ? "Todavía no hay encargos." : `No hay encargos con estado "${STATUS_LABELS[filter]?.label ?? filter}".`}
+            </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
-            {orders.map((order) => {
-              const s = STATUS_LABELS[order.status] ?? STATUS_LABELS["pending"];
+          <div className="flex flex-col gap-3">
+            {filtered.map((order) => {
+              const s = STATUS_LABELS[order.status] ?? STATUS_LABELS["pending"]!;
               return (
-                <div key={order.id} className="border border-muted bg-card p-6 flex flex-col md:flex-row md:items-start gap-6">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-3 flex-wrap">
-                      <span className="font-mono text-xs text-muted-foreground">#{order.id}</span>
-                      <h3 className="font-mono font-bold text-sm">{order.name}</h3>
-                      <Badge variant="outline" className={`font-mono text-xs rounded-none ${s.color}`}>{s.label}</Badge>
+                <motion.div
+                  key={order.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`border border-muted border-l-4 ${s.border} bg-card flex flex-col sm:flex-row`}
+                >
+                  {/* Main info */}
+                  <div className="flex-1 min-w-0 p-5">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className="font-mono text-xs text-muted-foreground/50">#{order.id}</span>
+                      <span className="font-mono text-sm font-bold">{order.name}</span>
+                      <Badge variant="outline" className={`font-mono text-xs rounded-none px-2 py-0 h-5 ${s.badge}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 inline-block ${s.dot}`} />
+                        {s.label}
+                      </Badge>
+                      <span className="font-mono text-xs text-muted-foreground/40 ml-auto">{timeAgo(order.createdAt)}</span>
                     </div>
-                    <p className="font-mono text-sm font-semibold text-primary mb-1">{order.product}</p>
-                    <p className="text-sm text-muted-foreground mb-2 leading-relaxed">{order.details}</p>
-                    <p className="font-mono text-xs text-muted-foreground/60">
-                      Contacto: <span className="text-muted-foreground">{order.contact}</span>
-                      {" · "}
-                      {new Date(order.createdAt).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </p>
+
+                    <p className="font-mono text-base font-bold text-foreground mb-1.5">{order.product}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-3 max-w-xl">{order.details}</p>
+
+                    <div className="flex items-center gap-1.5 font-mono text-xs">
+                      <span className="text-muted-foreground/50">Contacto:</span>
+                      <span className="text-primary font-semibold">{order.contact}</span>
+                    </div>
                   </div>
-                  <div className="flex flex-row md:flex-col gap-2 shrink-0">
-                    {["pending", "in_progress", "done"].map((s) => (
-                      <Button
-                        key={s}
-                        size="sm"
-                        variant={order.status === s ? "default" : "outline"}
-                        className={`font-mono rounded-none text-xs h-8 ${order.status === s ? "bg-primary text-primary-foreground" : "border-muted text-muted-foreground"}`}
-                        onClick={() => updateStatus(order.id, s)}
-                        disabled={order.status === s}
+
+                  {/* Status actions */}
+                  <div className="flex sm:flex-col gap-1 p-3 sm:border-l border-t sm:border-t-0 border-muted bg-background/30 justify-end sm:justify-start">
+                    {STATUS_KEYS.map((key) => (
+                      <button
+                        key={key}
+                        onClick={() => updateStatus(order.id, key)}
+                        disabled={order.status === key}
+                        className={`font-mono text-xs px-3 py-1.5 transition-all border rounded-none ${
+                          order.status === key
+                            ? `${STATUS_LABELS[key].badge} cursor-default`
+                            : "border-muted text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+                        }`}
                       >
-                        {STATUS_LABELS[s]?.label}
-                      </Button>
+                        {STATUS_LABELS[key].label}
+                      </button>
                     ))}
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
