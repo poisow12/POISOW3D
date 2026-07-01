@@ -38,24 +38,32 @@ function LogoMark({ size = 28 }: { size?: number }) {
 
 /* ─── Printer Visual ─────────────────────────────────────────────────────── */
 function PrinterVisual() {
-  const [t, setT] = useState(0);
-  const startRef = useRef<number>(0);
+  const [rawMs, setRawMs] = useState(0);
   const frameRef = useRef<number>(0);
+  const startRef = useRef<number | null>(null);
 
   useEffect(() => {
-    startRef.current = performance.now();
     const loop = (ts: number) => {
-      const LOOP_MS = 11000;
-      setT(((ts - startRef.current) % LOOP_MS) / LOOP_MS);
+      if (startRef.current === null) startRef.current = ts;
+      setRawMs(ts - startRef.current);
       frameRef.current = requestAnimationFrame(loop);
     };
     frameRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameRef.current);
   }, []);
 
-  const NUM_LAYERS = 6;
-  const LAYER_H = 11;
-  const PRINT_FRAC = 0.78; // first 78% = printing, rest = show complete + reset
+  const LOOP_MS = 12000;
+  const t = (rawMs % LOOP_MS) / LOOP_MS;
+  // Fast pulse for nozzle glow (every 800ms)
+  const glowPulse = 0.55 + 0.45 * Math.sin((rawMs % 800) / 800 * Math.PI * 2);
+  // Slower bed heat pulse (every 2400ms)
+  const bedPulse = 0.04 + 0.03 * Math.sin((rawMs % 2400) / 2400 * Math.PI * 2);
+  // Fan rotation angle
+  const fanAngle = (rawMs / 4) % 360;
+
+  const NUM_LAYERS = 7;
+  const LAYER_H = 10;
+  const PRINT_FRAC = 0.80;
   const isPrinting = t < PRINT_FRAC;
 
   const printT = isPrinting ? t / PRINT_FRAC : 1;
@@ -64,14 +72,16 @@ function PrinterVisual() {
   const layerProg = totalPhase - Math.floor(totalPhase);
 
   // Printer geometry
-  const POST_L = 30;
-  const POST_R = 330;
-  const FRAME_TOP = 14;
-  const BED_TOP = 238;
-  const PL = 72;   // print area left
-  const PR = 290;  // print area right
+  const POST_L = 28;
+  const POST_R = 308;
+  const FRAME_TOP = 10;
+  const BED_TOP = 236;
+  const PL = 68;
+  const PR = 270;
   const PW = PR - PL;
-  const NOZZLE_DROP = 40; // gantry top to nozzle tip
+  const NOZZLE_DROP = 42;
+  const DEPTH_X = 22;  // isometric depth for 3D object
+  const DEPTH_Y = 11;
 
   const goingRight = layerIdx % 2 === 0;
   const nozzleNorm = goingRight ? layerProg : 1 - layerProg;
@@ -79,160 +89,230 @@ function PrinterVisual() {
 
   const layerTopY = (idx: number) => BED_TOP - (idx + 1) * LAYER_H;
   const currentTopY = layerTopY(layerIdx);
-  const nozzleTipY = isPrinting ? currentTopY : layerTopY(NUM_LAYERS - 1) - 8;
+  const nozzleTipY = isPrinting ? currentTopY : layerTopY(NUM_LAYERS - 1) - 6;
   const gantryY = nozzleTipY - NOZZLE_DROP;
 
   const curLayerX = goingRight ? PL : PL + layerProg * PW;
   const curLayerW = layerProg * PW;
 
-  const layerColor = (i: number) => (i % 2 === 0 ? "#FF5A2A" : "#D94E22");
+  const layerFrontColor = (i: number) => (i % 2 === 0 ? "#FF5A2A" : "#D94E22");
+  const layerSideColor  = (i: number) => (i % 2 === 0 ? "#B83D1A" : "#A33318");
+  const layerTopColor   = "#FF7850";
   const pct = Math.round(t * 100);
+  const completedLayerCount = isPrinting ? layerIdx : NUM_LAYERS;
 
   return (
     <div className="relative w-full flex items-center justify-center p-4 md:p-6">
-      <svg viewBox="0 0 360 280" fill="none" className="w-full max-w-[400px]"
-        style={{ filter: "drop-shadow(0 4px 32px rgba(255,90,42,0.13))" }}>
+      <svg viewBox="0 0 370 280" fill="none" className="w-full max-w-[420px]"
+        style={{ filter: "drop-shadow(0 6px 40px rgba(255,90,42,0.18))" }}>
         <defs>
           <linearGradient id="postG" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#3F3F46" />
-            <stop offset="100%" stopColor="#27272A" />
+            <stop offset="0%" stopColor="#3F3F46" /><stop offset="100%" stopColor="#27272A" />
           </linearGradient>
           <linearGradient id="gantryG" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#52525B" />
-            <stop offset="100%" stopColor="#3F3F46" />
+            <stop offset="0%" stopColor="#52525B" /><stop offset="100%" stopColor="#3F3F46" />
           </linearGradient>
           <radialGradient id="nozzleGlowG" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#FF5A2A" stopOpacity="0.55" />
+            <stop offset="0%" stopColor="#FF5A2A" stopOpacity={glowPulse * 0.7} />
+            <stop offset="60%" stopColor="#FF5A2A" stopOpacity={glowPulse * 0.15} />
             <stop offset="100%" stopColor="#FF5A2A" stopOpacity="0" />
           </radialGradient>
+          <radialGradient id="bedGlowG" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#FF2200" stopOpacity={bedPulse * 2} />
+            <stop offset="100%" stopColor="#FF2200" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id="layerGlowG" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#FF7A50" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#FF5A2A" stopOpacity="0" />
+          </radialGradient>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
         </defs>
 
-        {/* ── FRAME ── */}
-        {/* Left post */}
-        <rect x={POST_L} y={FRAME_TOP} width="13" height="240" rx="2" fill="url(#postG)" />
-        <rect x={POST_L + 2} y={FRAME_TOP + 2} width="2" height="236" fill="#52525B" opacity="0.35" />
-        {/* Right post */}
-        <rect x={POST_R - 13} y={FRAME_TOP} width="13" height="240" rx="2" fill="#27272A" />
-        <rect x={POST_R - 5} y={FRAME_TOP + 2} width="2" height="236" fill="#52525B" opacity="0.35" />
+        {/* ── FRAME POSTS ── */}
+        <rect x={POST_L} y={FRAME_TOP} width="12" height="240" rx="2" fill="url(#postG)" />
+        <rect x={POST_L + 2} y={FRAME_TOP + 2} width="2" height="236" fill="#52525B" opacity="0.3" />
+        <rect x={POST_R - 12} y={FRAME_TOP} width="12" height="240" rx="2" fill="#27272A" />
+        <rect x={POST_R - 5} y={FRAME_TOP + 2} width="2" height="236" fill="#52525B" opacity="0.25" />
+
         {/* Top bar */}
-        <rect x={POST_L} y={FRAME_TOP} width={POST_R - POST_L} height="11" rx="2" fill="#3F3F46" />
-        <rect x={POST_L + 3} y={FRAME_TOP + 2} width={POST_R - POST_L - 6} height="4" rx="1" fill="#52525B" opacity="0.45" />
+        <rect x={POST_L} y={FRAME_TOP} width={POST_R - POST_L} height="10" rx="2" fill="#3F3F46" />
+        <rect x={POST_L + 3} y={FRAME_TOP + 2} width={POST_R - POST_L - 6} height="3.5" rx="1" fill="#52525B" opacity="0.4" />
+
         {/* Feet */}
-        <rect x={POST_L - 10} y={252} width="44" height="9" rx="2" fill="#27272A" />
-        <rect x={POST_L - 10} y={250} width="44" height="4" rx="1" fill="#3F3F46" />
-        <rect x={POST_R - 34} y={252} width="44" height="9" rx="2" fill="#27272A" />
-        <rect x={POST_R - 34} y={250} width="44" height="4" rx="1" fill="#3F3F46" />
+        <rect x={POST_L - 8} y={250} width="40" height="8" rx="2" fill="#27272A" />
+        <rect x={POST_L - 8} y={248} width="40" height="4" rx="1" fill="#3F3F46" />
+        <rect x={POST_R - 32} y={250} width="40" height="8" rx="2" fill="#27272A" />
+        <rect x={POST_R - 32} y={248} width="40" height="4" rx="1" fill="#3F3F46" />
+
         {/* Lead screws */}
-        <rect x={POST_L + 5} y={FRAME_TOP + 13} width="3" height="224" fill="#52525B" opacity="0.5" />
-        <rect x={POST_R - 8} y={FRAME_TOP + 13} width="3" height="224" fill="#52525B" opacity="0.5" />
+        <rect x={POST_L + 4} y={FRAME_TOP + 12} width="3" height="226" fill="#52525B" opacity="0.45" />
+        <rect x={POST_R - 7} y={FRAME_TOP + 12} width="3" height="226" fill="#52525B" opacity="0.45" />
+        {/* Screw thread marks */}
+        {Array.from({ length: 18 }, (_, i) => (
+          <line key={i} x1={POST_L + 4} y1={FRAME_TOP + 14 + i * 12} x2={POST_L + 7} y2={FRAME_TOP + 14 + i * 12}
+            stroke="#71717A" strokeWidth="0.5" opacity="0.4" />
+        ))}
 
-        {/* ── LCD ── */}
-        <rect x={POST_L + 18} y={FRAME_TOP + 3} width="46" height="28" rx="2" fill="#0C1010" stroke="#3F3F46" strokeWidth="0.5" />
-        <rect x={POST_L + 20} y={FRAME_TOP + 5} width="42" height="24" rx="1" fill="#091209" />
-        <text x={POST_L + 22} y={FRAME_TOP + 14} fontFamily="monospace" fontSize="4.5" fill="#9FD356" letterSpacing="0.5">poisow 3d</text>
+        {/* ── LCD SCREEN ── */}
+        <rect x={POST_L + 16} y={FRAME_TOP + 2} width="56" height="32" rx="2" fill="#080E08" stroke="#3F3F46" strokeWidth="0.8" />
+        <rect x={POST_L + 18} y={FRAME_TOP + 4} width="52" height="28" rx="1" fill="#060D06" />
+        {/* Screen content */}
+        <text x={POST_L + 20} y={FRAME_TOP + 12} fontFamily="monospace" fontSize="4.5" fill="#9FD356" letterSpacing="0.3">poisow 3d</text>
+        <text x={POST_L + 20} y={FRAME_TOP + 19} fontFamily="monospace" fontSize="3.8" fill="#5A8A3A" letterSpacing="0.2">{`T:210 B:60°C`}</text>
         {/* Progress bar track */}
-        <rect x={POST_L + 21} y={FRAME_TOP + 18} width="38" height="3" rx="1" fill="#1A2A1A" />
-        {/* Progress bar fill */}
-        <rect x={POST_L + 21} y={FRAME_TOP + 18} width={38 * t} height="3" rx="1" fill="#9FD356" />
-        <text x={POST_L + 21} y={FRAME_TOP + 27} fontFamily="monospace" fontSize="4" fill="#3A5A3A">{pct}%</text>
+        <rect x={POST_L + 20} y={FRAME_TOP + 22} width="46" height="3.5" rx="1.5" fill="#122212" />
+        {/* Progress fill */}
+        <rect x={POST_L + 20} y={FRAME_TOP + 22} width={46 * t} height="3.5" rx="1.5" fill="#9FD356" />
+        {/* LCD glare */}
+        <rect x={POST_L + 18} y={FRAME_TOP + 4} width="14" height="28" rx="1" fill="white" opacity="0.025" />
+        <text x={POST_L + 20} y={FRAME_TOP + 30} fontFamily="monospace" fontSize="3.5" fill="#4A6A3A">{pct}% complet.</text>
 
-        {/* ── FILAMENT SPOOL (top-right corner) ── */}
-        <circle cx={POST_R + 12} cy={FRAME_TOP + 30} r="22" fill="#1C1C1F" stroke="#3F3F46" strokeWidth="1.5" />
-        <circle cx={POST_R + 12} cy={FRAME_TOP + 30} r="9" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
-        <circle cx={POST_R + 12} cy={FRAME_TOP + 30} r="4" fill="#3F3F46" />
-        {/* Filament wound on spool */}
-        <path d={`M${POST_R - 8} ${FRAME_TOP + 28} A22 22 0 0 1 ${POST_R + 12} ${FRAME_TOP + 8}`}
-          stroke="#FF5A2A" strokeWidth="3.5" fill="none" opacity="0.8" />
-        <path d={`M${POST_R - 8} ${FRAME_TOP + 22} A22 22 0 0 1 ${POST_R + 4} ${FRAME_TOP + 9}`}
-          stroke="#CC3A11" strokeWidth="2" fill="none" opacity="0.5" />
+        {/* ── FILAMENT SPOOL ── */}
+        <circle cx={POST_R + 26} cy={FRAME_TOP + 36} r="26" fill="#1A1A1D" stroke="#3F3F46" strokeWidth="1.5" />
+        {/* Wound filament */}
+        <circle cx={POST_R + 26} cy={FRAME_TOP + 36} r="22" fill="none" stroke="#FF5A2A" strokeWidth="5" strokeDasharray="60 12" opacity="0.7" />
+        <circle cx={POST_R + 26} cy={FRAME_TOP + 36} r="16" fill="none" stroke="#CC3A11" strokeWidth="3" strokeDasharray="40 10" opacity="0.45" />
+        {/* Hub */}
+        <circle cx={POST_R + 26} cy={FRAME_TOP + 36} r="8" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
+        {/* Hub spokes */}
+        {[0, 60, 120, 180, 240, 300].map(deg => {
+          const rad = deg * Math.PI / 180;
+          return <line key={deg}
+            x1={POST_R + 26 + Math.cos(rad) * 3} y1={FRAME_TOP + 36 + Math.sin(rad) * 3}
+            x2={POST_R + 26 + Math.cos(rad) * 7} y2={FRAME_TOP + 36 + Math.sin(rad) * 7}
+            stroke="#52525B" strokeWidth="1" />;
+        })}
+        <circle cx={POST_R + 26} cy={FRAME_TOP + 36} r="3" fill="#3F3F46" />
 
         {/* PTFE tube from spool to carriage */}
-        <path d={`M${POST_R + 2} ${FRAME_TOP + 14} C${nozzleX + 40} ${gantryY - 45} ${nozzleX + 20} ${gantryY - 20} ${nozzleX + 9} ${gantryY + 2}`}
-          stroke="#D4D4D8" strokeWidth="2" strokeDasharray="5 3" opacity="0.3" fill="none" />
+        <path d={`M${POST_R + 8} ${FRAME_TOP + 24} C${nozzleX + 60} ${gantryY - 50} ${nozzleX + 30} ${gantryY - 22} ${nozzleX + 10} ${gantryY + 2}`}
+          stroke="#D4D4D8" strokeWidth="2.5" strokeDasharray="6 3" opacity="0.25" fill="none" />
 
         {/* ── HEATED BED ── */}
-        {/* Bed carriage */}
-        <rect x="48" y={BED_TOP + 6} width="264" height="9" rx="1" fill="#27272A" />
-        {/* Bed surface (heated) */}
-        <rect x="55" y={BED_TOP - 2} width="250" height="9" rx="1" fill="#3F3F46" />
-        {/* Glass/steel sheet */}
-        <rect x="57" y={BED_TOP - 4} width="246" height="7" rx="0.5" fill="#52525B" />
-        {/* Bed grid */}
-        {[90, 120, 150, 180, 210, 240, 270].map(gx => (
-          <line key={gx} x1={gx} y1={BED_TOP - 4} x2={gx} y2={BED_TOP + 3} stroke="#3F3F46" strokeWidth="0.6" />
+        {/* Bed carriage rails */}
+        <rect x="44" y={BED_TOP + 7} width={POST_R - 44 + 12} height="8" rx="1" fill="#1E1E22" />
+        {/* Bed heater PCB */}
+        <rect x="52" y={BED_TOP + 1} width={PW + 16} height="8" rx="1" fill="#2A2A32" />
+        {/* Glass/PEI sheet */}
+        <rect x="55" y={BED_TOP - 4} width={PW + 10} height="7" rx="0.5" fill="#48484F" />
+        {/* Glass highlight */}
+        <rect x="56" y={BED_TOP - 4} width="30" height="7" rx="0.5" fill="white" opacity="0.04" />
+        {/* Bed grid lines */}
+        {[PL + 20, PL + 46, PL + 72, PL + 98, PL + 124, PL + 150, PL + 176].map(gx => (
+          <line key={gx} x1={gx} y1={BED_TOP - 4} x2={gx} y2={BED_TOP + 3} stroke="#3A3A42" strokeWidth="0.7" />
         ))}
-        {/* Bed warm tint */}
-        <rect x="57" y={BED_TOP - 4} width="246" height="7" rx="0.5" fill="#FF2200" opacity="0.05" />
+        {/* Bed heat glow */}
+        <ellipse cx={(PL + PR) / 2} cy={BED_TOP} rx={PW / 2} ry="6" fill="url(#bedGlowG)" />
 
-        {/* ── PRINTED OBJECT ── */}
-        {/* Completed layers */}
-        {Array.from({ length: isPrinting ? layerIdx : NUM_LAYERS }, (_, i) => (
-          <g key={i}>
-            <rect x={PL} y={layerTopY(i)} width={PW} height={LAYER_H} fill={layerColor(i)} />
-            <rect x={PL} y={layerTopY(i)} width={PW} height="1.5" fill="white" opacity="0.07" />
-            <rect x={PL} y={layerTopY(i) + LAYER_H - 1} width={PW} height="1" fill="black" opacity="0.18" />
-          </g>
-        ))}
+        {/* ── 3D PRINTED OBJECT ── */}
+        {/* Completed layers — isometric style with front + right face + top cap */}
+        {Array.from({ length: completedLayerCount }, (_, i) => {
+          const ty = layerTopY(i);
+          const fc = layerFrontColor(i);
+          const sc = layerSideColor(i);
+          return (
+            <g key={i}>
+              {/* Front face */}
+              <rect x={PL} y={ty} width={PW} height={LAYER_H} fill={fc} />
+              {/* Highlight stripe */}
+              <rect x={PL} y={ty} width={PW} height="1.5" fill="white" opacity="0.09" />
+              {/* Shadow stripe */}
+              <rect x={PL} y={ty + LAYER_H - 1} width={PW} height="1" fill="black" opacity="0.2" />
+              {/* Right face (isometric depth) */}
+              <polygon
+                points={`${PR},${ty} ${PR + DEPTH_X},${ty - DEPTH_Y} ${PR + DEPTH_X},${ty + LAYER_H - DEPTH_Y} ${PR},${ty + LAYER_H}`}
+                fill={sc} />
+              {/* Right face highlight */}
+              <polygon
+                points={`${PR},${ty} ${PR + DEPTH_X},${ty - DEPTH_Y} ${PR + DEPTH_X},${ty - DEPTH_Y + 1.5} ${PR},${ty + 1.5}`}
+                fill="white" opacity="0.06" />
+            </g>
+          );
+        })}
+
+        {/* Top cap of completed object */}
+        {completedLayerCount > 0 && (
+          <polygon
+            points={`${PL},${layerTopY(completedLayerCount - 1)} ${PL + DEPTH_X},${layerTopY(completedLayerCount - 1) - DEPTH_Y} ${PR + DEPTH_X},${layerTopY(completedLayerCount - 1) - DEPTH_Y} ${PR},${layerTopY(completedLayerCount - 1)}`}
+            fill={layerTopColor} opacity="0.75" />
+        )}
+
         {/* Current partial layer */}
         {isPrinting && curLayerW > 1 && (
           <g>
-            <rect x={curLayerX} y={currentTopY} width={curLayerW} height={LAYER_H} fill={layerColor(layerIdx)} />
-            <rect x={curLayerX} y={currentTopY} width={curLayerW} height="1.5" fill="white" opacity="0.1" />
+            <rect x={curLayerX} y={currentTopY} width={curLayerW} height={LAYER_H} fill={layerFrontColor(layerIdx)} />
+            <rect x={curLayerX} y={currentTopY} width={curLayerW} height="1.5" fill="white" opacity="0.12" />
+            {/* Freshly extruded glow on the new layer */}
+            <rect x={curLayerX} y={currentTopY} width={curLayerW} height={LAYER_H} fill="#FF7A50" opacity="0.18" />
           </g>
         )}
 
         {/* ── GANTRY / X-AXIS BEAM ── */}
-        <rect x={POST_L + 13} y={gantryY} width={POST_R - POST_L - 26} height="11" rx="1.5" fill="url(#gantryG)" />
-        {/* Rail highlight */}
-        <rect x={POST_L + 13} y={gantryY + 1} width={POST_R - POST_L - 26} height="3.5" rx="0.5" fill="#71717A" opacity="0.4" />
-        {/* Rail groove */}
-        <rect x={POST_L + 13} y={gantryY + 4} width={POST_R - POST_L - 26} height="2" rx="0.5" fill="#18181B" opacity="0.5" />
+        <rect x={POST_L + 12} y={gantryY} width={POST_R - POST_L - 24} height="10" rx="1.5" fill="url(#gantryG)" />
+        <rect x={POST_L + 12} y={gantryY + 1} width={POST_R - POST_L - 24} height="3" rx="0.5" fill="#71717A" opacity="0.35" />
+        <rect x={POST_L + 12} y={gantryY + 4} width={POST_R - POST_L - 24} height="1.5" rx="0.5" fill="#18181B" opacity="0.5" />
 
-        {/* ── PRINT CARRIAGE & HOT END ── */}
-        {/* Carriage body */}
-        <rect x={nozzleX - 20} y={gantryY - 5} width="40" height="24" rx="3" fill="#232328" stroke="#3F3F46" strokeWidth="1" />
-        {/* Top grip */}
-        <rect x={nozzleX - 17} y={gantryY - 3} width="34" height="9" rx="2" fill="#3F3F46" />
-        <rect x={nozzleX - 15} y={gantryY - 1} width="30" height="4" rx="1" fill="#52525B" opacity="0.5" />
-        {/* Fan shroud (left side) */}
-        <rect x={nozzleX - 18} y={gantryY + 7} width="15" height="14" rx="2" fill="#141418" stroke="#2A2A30" strokeWidth="0.5" />
-        {/* Fan blade */}
-        <circle cx={nozzleX - 10} cy={gantryY + 14} r="5.5" stroke="#2A2A30" strokeWidth="0.7" fill="none" />
-        <circle cx={nozzleX - 10} cy={gantryY + 14} r="1.8" fill="#1C1C22" />
-        {/* Fan blade spokes */}
+        {/* ── PRINT CARRIAGE ── */}
+        {/* Main body */}
+        <rect x={nozzleX - 19} y={gantryY - 4} width="38" height="22" rx="3" fill="#1E1E24" stroke="#3A3A42" strokeWidth="0.8" />
+        {/* Top clamp */}
+        <rect x={nozzleX - 16} y={gantryY - 2} width="32" height="8" rx="2" fill="#3A3A42" />
+        <rect x={nozzleX - 14} y={gantryY} width="28" height="4" rx="1" fill="#4A4A52" opacity="0.6" />
+
+        {/* Fan housing */}
+        <rect x={nozzleX - 17} y={gantryY + 8} width="14" height="13" rx="2" fill="#141418" stroke="#28282E" strokeWidth="0.5" />
+        {/* Fan blades (rotating) */}
         {[0, 60, 120, 180, 240, 300].map(deg => {
-          const rad = (deg * Math.PI) / 180;
+          const rad = (deg + fanAngle) * Math.PI / 180;
           return <line key={deg}
-            x1={nozzleX - 10} y1={gantryY + 14}
-            x2={nozzleX - 10 + Math.cos(rad) * 5} y2={gantryY + 14 + Math.sin(rad) * 5}
-            stroke="#2A2A32" strokeWidth="0.8" />;
+            x1={nozzleX - 10} y1={gantryY + 14.5}
+            x2={nozzleX - 10 + Math.cos(rad) * 5} y2={gantryY + 14.5 + Math.sin(rad) * 5}
+            stroke="#2E2E36" strokeWidth="1.2" />;
         })}
+        <circle cx={nozzleX - 10} cy={gantryY + 14.5} r="6" stroke="#28282E" strokeWidth="0.8" fill="none" />
+        <circle cx={nozzleX - 10} cy={gantryY + 14.5} r="2" fill="#1A1A20" />
+
+        {/* Heat break / cold end */}
+        <rect x={nozzleX - 2} y={gantryY + 6} width="7" height="12" rx="1" fill="#27272A" stroke="#3A3A42" strokeWidth="0.5" />
+        {/* Fins on heat break */}
+        {[0, 3, 6, 9].map(fi => (
+          <rect key={fi} x={nozzleX - 4} y={gantryY + 7 + fi} width="11" height="1.5" rx="0.5" fill="#3A3A42" />
+        ))}
+
         {/* Heater block */}
-        <rect x={nozzleX - 5} y={gantryY + 20} width="12" height="10" rx="1.5" fill="#C23000" />
-        <rect x={nozzleX - 4} y={gantryY + 21} width="10" height="8" rx="1" fill="#E03800" opacity="0.7" />
-        <rect x={nozzleX - 3} y={gantryY + 22} width="8" height="6" rx="0.5" fill="#FF5A2A" opacity="0.4" />
-        {/* Heat creep block */}
-        <rect x={nozzleX - 3} y={gantryY + 8} width="8" height="12" rx="1" fill="#27272A" stroke="#3F3F46" strokeWidth="0.5" />
+        <rect x={nozzleX - 4} y={gantryY + 18} width="11" height="10" rx="1.5" fill="#C02800" />
+        <rect x={nozzleX - 3} y={gantryY + 19} width="9" height="8" rx="1" fill="#E03200" opacity="0.8" />
+        {/* Heater glow overlay */}
+        <rect x={nozzleX - 4} y={gantryY + 18} width="11" height="10" rx="1.5" fill="#FF5A2A" opacity={glowPulse * 0.3} />
+        {/* Thermistor wire */}
+        <path d={`M${nozzleX + 6} ${gantryY + 22} C${nozzleX + 14} ${gantryY + 20} ${nozzleX + 18} ${gantryY + 10} ${nozzleX + 18} ${gantryY}`}
+          stroke="#D4D4D8" strokeWidth="0.8" fill="none" opacity="0.4" />
+
         {/* Nozzle */}
-        <path d={`M${nozzleX - 3.5} ${gantryY + 30} L${nozzleX + 3.5} ${gantryY + 30} L${nozzleX + 2} ${gantryY + 40} L${nozzleX - 2} ${gantryY + 40} Z`} fill="#71717A" />
-        <path d={`M${nozzleX - 2} ${gantryY + 40} L${nozzleX + 2} ${gantryY + 40} L${nozzleX + 1} ${gantryY + 43} L${nozzleX - 1} ${gantryY + 43} Z`} fill="#A1A1AA" />
+        <path d={`M${nozzleX - 3} ${gantryY + 28} L${nozzleX + 3} ${gantryY + 28} L${nozzleX + 1.5} ${gantryY + 38} L${nozzleX - 1.5} ${gantryY + 38} Z`} fill="#6A6A72" />
+        <path d={`M${nozzleX - 1.5} ${gantryY + 38} L${nozzleX + 1.5} ${gantryY + 38} L${nozzleX + 0.8} ${gantryY + 41} L${nozzleX - 0.8} ${gantryY + 41} Z`} fill="#A1A1AA" />
 
-        {/* ── NOZZLE GLOW & TIP ── */}
-        {/* Glow halo */}
-        <circle cx={nozzleX} cy={nozzleTipY} r="18" fill="url(#nozzleGlowG)" />
-        {/* Outer ring */}
-        <circle cx={nozzleX} cy={nozzleTipY} r="6" fill="#FF5A2A" opacity="0.18" />
-        {/* Tip */}
-        <circle cx={nozzleX} cy={nozzleTipY} r="3.5" fill="#FF5A2A" opacity="0.95" />
-        <circle cx={nozzleX} cy={nozzleTipY} r="1.5" fill="white" opacity="0.65" />
+        {/* ── NOZZLE GLOW ── */}
+        {/* Wide ambient glow */}
+        <circle cx={nozzleX} cy={nozzleTipY} r="24" fill="url(#nozzleGlowG)" />
+        {/* Mid ring */}
+        <circle cx={nozzleX} cy={nozzleTipY} r="8" fill="#FF5A2A" opacity={glowPulse * 0.2} />
+        {/* Hot tip */}
+        <circle cx={nozzleX} cy={nozzleTipY} r="3.5" fill="#FF5A2A" opacity={0.8 + glowPulse * 0.2} filter="url(#glow)" />
+        <circle cx={nozzleX} cy={nozzleTipY} r="1.5" fill="white" opacity={0.5 + glowPulse * 0.35} />
 
-        {/* Extrusion thread (tiny line from nozzle to layer) */}
+        {/* Extrusion thread */}
         {isPrinting && curLayerW > 2 && (
-          <line
-            x1={nozzleX} y1={nozzleTipY}
-            x2={nozzleX} y2={currentTopY}
-            stroke="#FF5A2A" strokeWidth="1.8" opacity="0.55"
-          />
+          <line x1={nozzleX} y1={nozzleTipY} x2={nozzleX} y2={currentTopY}
+            stroke="#FF7A50" strokeWidth="2" opacity={0.5 + glowPulse * 0.3} />
+        )}
+
+        {/* Layer glow at current print position */}
+        {isPrinting && (
+          <ellipse cx={nozzleX} cy={currentTopY + 2} rx="14" ry="5" fill="url(#layerGlowG)" opacity={glowPulse * 0.8} />
         )}
       </svg>
     </div>
@@ -372,12 +452,6 @@ function Hero({ onOrderClick }: { onOrderClick: () => void }) {
     <section className="pt-28 pb-16 md:pt-40 md:pb-28 px-6 max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row items-center gap-12 md:gap-16">
         <div className="flex-1 flex flex-col items-start space-y-6">
-          {/* Local trust badge */}
-          <div className="flex items-center gap-2 text-sm font-mono text-muted-foreground border border-muted px-3 py-1.5">
-            <MapPin className="w-3.5 h-3.5 text-primary" />
-            Bilbao · Trato directo · Sin intermediarios
-          </div>
-
           <h1 className="font-mono text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05] text-foreground">
             Tu idea,<br />impresa<br /><span className="text-primary">capa a capa.</span>
           </h1>
@@ -413,119 +487,109 @@ function Hero({ onOrderClick }: { onOrderClick: () => void }) {
 }
 
 /* ─── Catalog ────────────────────────────────────────────────────────────── */
-const PRODUCTS = [
-  {
-    name: "Llavero personalizado",
-    desc: "Con tu nombre, initiales, logo o diseño favorito. Pequeño, ligero y resistente.",
-    detail: "Perfecto como regalo o para identificar tus llaves con estilo.",
-    price: "4,50€",
-    badge: "Más pedido",
-    badgeColor: "text-primary border-primary/40 bg-primary/10",
-    icon: (
-      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
-        <circle cx="22" cy="20" r="12" stroke="#FF5A2A" strokeWidth="2.5" />
-        <circle cx="22" cy="20" r="6" stroke="#FF5A2A" strokeWidth="1.5" strokeDasharray="3 2" />
-        <path d="M31 27 L52 48" stroke="#71717A" strokeWidth="3" strokeLinecap="round" />
-        <path d="M46 44 L56 44" stroke="#FF5A2A" strokeWidth="2.5" strokeLinecap="round" />
-        <rect x="30" y="45" width="18" height="8" rx="4" stroke="#52525B" strokeWidth="2" />
-      </svg>
-    )
-  },
-  {
-    name: "Soporte de móvil",
-    desc: "Para escritorio o uso vertical. Estable, con el ángulo que necesites.",
-    detail: "Diseño limpio que encaja en cualquier espacio de trabajo.",
-    price: "7€",
-    badge: "Popular",
-    badgeColor: "text-secondary border-secondary/40 bg-secondary/10",
-    icon: (
-      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
-        <rect x="20" y="8" width="24" height="38" rx="3" stroke="#9FD356" strokeWidth="2.5" />
-        <rect x="23" y="11" width="18" height="26" rx="1" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
-        <circle cx="32" cy="42" r="2" stroke="#9FD356" strokeWidth="1.5" />
-        <path d="M20 48 L14 56" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round" />
-        <path d="M44 48 L50 56" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round" />
-        <path d="M10 56 L54 56" stroke="#71717A" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    )
-  },
-  {
-    name: "Figura gaming / meme",
-    desc: "Personajes, logos, memes en 3D desde tu imagen o diseño. Cada pieza es única.",
-    detail: "Trae tu referencia y lo imprimimos tal cual.",
-    price: "desde 6€",
-    badge: "A medida",
-    badgeColor: "text-primary border-primary/40 bg-primary/10",
-    icon: (
-      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
-        <rect x="8" y="24" width="48" height="28" rx="8" stroke="#FF5A2A" strokeWidth="2.5" />
-        <path d="M20 36 L20 44" stroke="#FF5A2A" strokeWidth="2.5" strokeLinecap="round" />
-        <path d="M16 40 L24 40" stroke="#FF5A2A" strokeWidth="2.5" strokeLinecap="round" />
-        <circle cx="42" cy="39" r="2.5" fill="#FF5A2A" />
-        <circle cx="48" cy="35" r="2.5" fill="#9FD356" />
-        <path d="M22 24 C22 14 42 14 42 24" stroke="#52525B" strokeWidth="2" strokeDasharray="3 2" />
-        <circle cx="32" cy="11" r="5" stroke="#71717A" strokeWidth="1.5" />
-      </svg>
-    )
-  },
-  {
-    name: "Organizador de escritorio",
-    desc: "Compartimentos para bolígrafos, cables, notas o lo que necesites tener a mano.",
-    detail: "Las medidas y divisiones, a tu gusto.",
-    price: "9€",
-    badge: "Personalizable",
-    badgeColor: "text-secondary border-secondary/40 bg-secondary/10",
-    icon: (
-      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
-        <rect x="8" y="28" width="48" height="28" rx="2" stroke="#9FD356" strokeWidth="2.5" />
-        <path d="M24 28 L24 56" stroke="#9FD356" strokeWidth="1.5" />
-        <path d="M40 28 L40 56" stroke="#9FD356" strokeWidth="1.5" />
-        <path d="M16 10 L16 28" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
-        <path d="M32 8 L32 28" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
-        <path d="M48 13 L48 28" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
-        <path d="M12 10 L20 10" stroke="#71717A" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M28 8 L36 8" stroke="#71717A" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    )
-  },
-  {
-    name: "Maceta decorativa",
-    desc: "Geométrica, moderna o con diseño propio. Para plantas pequeñas o suculentas.",
-    detail: "Con o sin agujero de drenaje, a elegir.",
-    price: "desde 5€",
-    badge: "Ecofriendly",
-    badgeColor: "text-secondary border-secondary/40 bg-secondary/10",
-    icon: (
-      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
-        <path d="M16 28 L20 52 L44 52 L48 28 Z" stroke="#9FD356" strokeWidth="2.5" strokeLinejoin="round" />
-        <path d="M12 28 L52 28" stroke="#9FD356" strokeWidth="2" strokeLinecap="round" />
-        <path d="M32 28 C32 20 32 14 32 14" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
-        <path d="M32 20 C26 16 22 11 28 8" stroke="#9FD356" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M32 17 C38 13 42 8 36 6" stroke="#9FD356" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    )
-  },
-  {
-    name: "Pieza a medida",
-    desc: "¿Tienes un STL, una imagen o solo una idea? Lo imprimimos sin problema.",
-    detail: "Presupuesto sin compromiso antes de confirmar.",
-    price: "Consultar",
-    badge: "100% personalizado",
-    badgeColor: "text-primary border-primary/40 bg-primary/10",
-    icon: (
-      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
-        <path d="M12 20 L32 10 L52 20 L52 44 L32 54 L12 44 Z" stroke="#FF5A2A" strokeWidth="2.5" strokeLinejoin="round" />
-        <path d="M12 20 L32 30 L52 20" stroke="#FF5A2A" strokeWidth="1.5" />
-        <path d="M32 30 L32 54" stroke="#FF5A2A" strokeWidth="1.5" />
-        <circle cx="46" cy="46" r="12" fill="#18181B" />
-        <path d="M46 40 L46 52" stroke="#9FD356" strokeWidth="2" strokeLinecap="round" />
-        <path d="M40 46 L52 46" stroke="#9FD356" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    )
-  }
+const CATALOG_ICONS: Record<string, React.ReactNode> = {
+  keychain: (
+    <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+      <circle cx="22" cy="20" r="12" stroke="#FF5A2A" strokeWidth="2.5" />
+      <circle cx="22" cy="20" r="6" stroke="#FF5A2A" strokeWidth="1.5" strokeDasharray="3 2" />
+      <path d="M31 27 L52 48" stroke="#71717A" strokeWidth="3" strokeLinecap="round" />
+      <path d="M46 44 L56 44" stroke="#FF5A2A" strokeWidth="2.5" strokeLinecap="round" />
+      <rect x="30" y="45" width="18" height="8" rx="4" stroke="#52525B" strokeWidth="2" />
+    </svg>
+  ),
+  phone: (
+    <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+      <rect x="20" y="8" width="24" height="38" rx="3" stroke="#9FD356" strokeWidth="2.5" />
+      <rect x="23" y="11" width="18" height="26" rx="1" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
+      <circle cx="32" cy="42" r="2" stroke="#9FD356" strokeWidth="1.5" />
+      <path d="M20 48 L14 56" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M44 48 L50 56" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M10 56 L54 56" stroke="#71717A" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  ),
+  figure: (
+    <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+      <rect x="8" y="24" width="48" height="28" rx="8" stroke="#FF5A2A" strokeWidth="2.5" />
+      <path d="M20 36 L20 44" stroke="#FF5A2A" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M16 40 L24 40" stroke="#FF5A2A" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="42" cy="39" r="2.5" fill="#FF5A2A" />
+      <circle cx="48" cy="35" r="2.5" fill="#9FD356" />
+      <path d="M22 24 C22 14 42 14 42 24" stroke="#52525B" strokeWidth="2" strokeDasharray="3 2" />
+      <circle cx="32" cy="11" r="5" stroke="#71717A" strokeWidth="1.5" />
+    </svg>
+  ),
+  organizer: (
+    <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+      <rect x="8" y="28" width="48" height="28" rx="2" stroke="#9FD356" strokeWidth="2.5" />
+      <path d="M24 28 L24 56" stroke="#9FD356" strokeWidth="1.5" />
+      <path d="M40 28 L40 56" stroke="#9FD356" strokeWidth="1.5" />
+      <path d="M16 10 L16 28" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
+      <path d="M32 8 L32 28" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
+      <path d="M48 13 L48 28" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 10 L20 10" stroke="#71717A" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M28 8 L36 8" stroke="#71717A" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+  pot: (
+    <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+      <path d="M16 28 L20 52 L44 52 L48 28 Z" stroke="#9FD356" strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M12 28 L52 28" stroke="#9FD356" strokeWidth="2" strokeLinecap="round" />
+      <path d="M32 28 C32 20 32 14 32 14" stroke="#52525B" strokeWidth="2" strokeLinecap="round" />
+      <path d="M32 20 C26 16 22 11 28 8" stroke="#9FD356" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M32 17 C38 13 42 8 36 6" stroke="#9FD356" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+  custom: (
+    <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16">
+      <path d="M12 20 L32 10 L52 20 L52 44 L32 54 L12 44 Z" stroke="#FF5A2A" strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M12 20 L32 30 L52 20" stroke="#FF5A2A" strokeWidth="1.5" />
+      <path d="M32 30 L32 54" stroke="#FF5A2A" strokeWidth="1.5" />
+      <circle cx="46" cy="46" r="12" fill="#18181B" />
+      <path d="M46 40 L46 52" stroke="#9FD356" strokeWidth="2" strokeLinecap="round" />
+      <path d="M40 46 L52 46" stroke="#9FD356" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  ),
+};
+
+type CatalogApiItem = {
+  id: number;
+  name: string;
+  description: string;
+  detail: string;
+  price: string;
+  badge: string;
+  badgeVariant: string;
+  iconType: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+};
+
+const STATIC_PRODUCTS: CatalogApiItem[] = [
+  { id: 0, name: "Llavero personalizado",    description: "Con tu nombre, iniciales, logo o diseño favorito. Pequeño, ligero y resistente.", detail: "Perfecto como regalo o para identificar tus llaves con estilo.",  price: "4,50€",    badge: "Más pedido",       badgeVariant: "orange", iconType: "keychain",  active: true, sortOrder: 0, createdAt: "" },
+  { id: 1, name: "Soporte de móvil",         description: "Para escritorio o uso vertical. Estable, con el ángulo que necesites.",           detail: "Diseño limpio que encaja en cualquier espacio de trabajo.",       price: "7€",       badge: "Popular",          badgeVariant: "green",  iconType: "phone",     active: true, sortOrder: 1, createdAt: "" },
+  { id: 2, name: "Figura gaming / meme",     description: "Personajes, logos, memes en 3D desde tu imagen o diseño. Cada pieza es única.",   detail: "Trae tu referencia y lo imprimimos tal cual.",                    price: "desde 6€", badge: "A medida",         badgeVariant: "orange", iconType: "figure",    active: true, sortOrder: 2, createdAt: "" },
+  { id: 3, name: "Organizador de escritorio",description: "Compartimentos para bolígrafos, cables, notas o lo que necesites tener a mano.", detail: "Las medidas y divisiones, a tu gusto.",                            price: "9€",       badge: "Personalizable",   badgeVariant: "green",  iconType: "organizer", active: true, sortOrder: 3, createdAt: "" },
+  { id: 4, name: "Maceta decorativa",        description: "Geométrica, moderna o con diseño propio. Para plantas pequeñas o suculentas.",    detail: "Con o sin agujero de drenaje, a elegir.",                         price: "desde 5€", badge: "Ecofriendly",      badgeVariant: "green",  iconType: "pot",       active: true, sortOrder: 4, createdAt: "" },
+  { id: 5, name: "Pieza a medida",           description: "¿Tienes un STL, una imagen o solo una idea? Lo imprimimos sin problema.",         detail: "Presupuesto sin compromiso antes de confirmar.",                  price: "Consultar",badge: "100% personalizado",badgeVariant: "orange", iconType: "custom",    active: true, sortOrder: 5, createdAt: "" },
 ];
 
+function badgeClass(variant: string) {
+  return variant === "green"
+    ? "text-secondary border-secondary/40 bg-secondary/10"
+    : "text-primary border-primary/40 bg-primary/10";
+}
+
 function Catalog({ onOrderClick }: { onOrderClick: (p: string) => void }) {
+  const [products, setProducts] = useState<CatalogApiItem[]>(STATIC_PRODUCTS);
+
+  useEffect(() => {
+    fetch("/api/catalog")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: CatalogApiItem[] | null) => { if (data && data.length > 0) setProducts(data); })
+      .catch(() => {/* keep static fallback */});
+  }, []);
+
   return (
     <section id="catalogo" className="py-24 px-6 bg-card border-y border-muted">
       <div className="max-w-6xl mx-auto">
@@ -538,33 +602,27 @@ function Catalog({ onOrderClick }: { onOrderClick: (p: string) => void }) {
         </motion.p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {PRODUCTS.map((prod, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.07 }}>
+          {products.map((prod, i) => (
+            <motion.div key={prod.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.07 }}>
               <Card
                 data-testid={`card-product-${i}`}
                 className="rounded-none border-muted bg-background hover:border-primary/60 transition-all duration-200 group flex flex-col h-full overflow-hidden"
               >
-                {/* Card header with icon */}
                 <div className="p-6 pb-4 bg-card border-b border-muted flex items-end justify-between">
-                  <div className="p-2">{prod.icon}</div>
-                  <Badge variant="outline" className={`font-mono text-xs rounded-none ${prod.badgeColor}`}>
+                  <div className="p-2">{CATALOG_ICONS[prod.iconType] ?? CATALOG_ICONS["custom"]}</div>
+                  <Badge variant="outline" className={`font-mono text-xs rounded-none ${badgeClass(prod.badgeVariant)}`}>
                     {prod.badge}
                   </Badge>
                 </div>
-
                 <div className="p-6 flex flex-col flex-1">
                   <h3 className="font-mono text-lg font-bold mb-1 group-hover:text-primary transition-colors">{prod.name}</h3>
-                  <p className="text-muted-foreground text-sm mb-2 leading-relaxed">{prod.desc}</p>
+                  <p className="text-muted-foreground text-sm mb-2 leading-relaxed">{prod.description}</p>
                   <p className="text-xs text-muted-foreground/60 font-mono mb-6 italic">{prod.detail}</p>
-
                   <div className="flex items-center justify-between mt-auto pt-4 border-t border-muted">
-                    <div>
-                      <span className="font-mono font-black text-xl text-foreground">{prod.price}</span>
-                    </div>
+                    <span className="font-mono font-black text-xl text-foreground">{prod.price}</span>
                     <Button
                       data-testid={`button-order-product-${i}`}
-                      variant="outline"
-                      size="sm"
+                      variant="outline" size="sm"
                       className="font-mono rounded-none border-muted hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
                       onClick={() => onOrderClick(prod.name)}
                     >
@@ -748,7 +806,7 @@ const FAQ_ITEMS = [
   { q: "¿Cuánto tarda un encargo?", a: "Depende del tamaño y la complejidad. Piezas pequeñas o medianas suelen estar listas en 2–5 días. Te doy un plazo concreto cuando confirmo el encargo, antes de imprimir nada." },
   { q: "¿Puedo enviar mi propio fichero STL?", a: "Sí, perfectamente. Si tienes el fichero listo, solo tienes que enviármelo junto con el material y el acabado que quieres. Si hay algún problema con el diseño, te aviso antes de empezar." },
   { q: "¿Cuánto cuesta?", a: "El precio depende del material, el tiempo de impresión y el acabado. Manda tu idea y te doy un presupuesto cerrado — sin sorpresas ni costes extra al final." },
-  { q: "¿Hacéis envíos fuera de Bilbao?", a: "Sí. Hago envíos a toda España. Si estás en Bilbao también puedes recogerlo en mano y nos ahorramos el envío." },
+  { q: "¿Hacéis envíos?", a: "Sí. Hago envíos a toda España. También puedes recogerlo en mano si lo prefieres y nos ahorramos el envío." },
   { q: "¿Qué materiales usáis?", a: "Trabajo principalmente con PLA, PETG, TPU y ABS. Si no sabes cuál elegir, cuéntame para qué es la pieza y te recomiendo el que mejor le va." },
   { q: "¿Qué pasa si la pieza sale mal?", a: "Si el resultado no cumple lo que acordamos, la vuelvo a imprimir sin coste adicional. La calidad es mi responsabilidad." },
 ];
@@ -835,6 +893,81 @@ function exportCsv(orders: Order[]) {
 type ToastMsg = { id: number; msg: string; type: "ok" | "err" };
 let toastId = 0;
 
+/* ─── CatalogItemForm ────────────────────────────────────────────────────── */
+function CatalogItemForm({
+  item, onChange, onSave, onCancel,
+}: {
+  item: Partial<CatalogApiItem>;
+  onChange: (v: Partial<CatalogApiItem>) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const f = (field: keyof CatalogApiItem, val: string | boolean | number) =>
+    onChange({ ...item, [field]: val });
+
+  const inputCls = "w-full h-9 px-3 bg-background border border-muted font-mono text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 rounded-none";
+  const labelCls = "font-mono text-xs uppercase tracking-widest text-muted-foreground mb-1 block";
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="sm:col-span-2">
+        <label className={labelCls}>Nombre</label>
+        <input className={inputCls} value={item.name ?? ""} onChange={(e) => f("name", e.target.value)} placeholder="Nombre del producto" />
+      </div>
+      <div className="sm:col-span-2">
+        <label className={labelCls}>Descripción corta</label>
+        <input className={inputCls} value={item.description ?? ""} onChange={(e) => f("description", e.target.value)} placeholder="Una línea descriptiva" />
+      </div>
+      <div className="sm:col-span-2">
+        <label className={labelCls}>Detalle extra</label>
+        <input className={inputCls} value={item.detail ?? ""} onChange={(e) => f("detail", e.target.value)} placeholder="Texto en cursiva bajo la descripción" />
+      </div>
+      <div>
+        <label className={labelCls}>Precio</label>
+        <input className={inputCls} value={item.price ?? ""} onChange={(e) => f("price", e.target.value)} placeholder="ej. 4,50€ o desde 6€" />
+      </div>
+      <div>
+        <label className={labelCls}>Etiqueta (badge)</label>
+        <input className={inputCls} value={item.badge ?? ""} onChange={(e) => f("badge", e.target.value)} placeholder="ej. Más pedido" />
+      </div>
+      <div>
+        <label className={labelCls}>Color badge</label>
+        <select className={inputCls} value={item.badgeVariant ?? "orange"} onChange={(e) => f("badgeVariant", e.target.value)}>
+          <option value="orange">Naranja (primary)</option>
+          <option value="green">Verde (secondary)</option>
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Icono</label>
+        <select className={inputCls} value={item.iconType ?? "custom"} onChange={(e) => f("iconType", e.target.value)}>
+          <option value="keychain">Llavero</option>
+          <option value="phone">Soporte móvil</option>
+          <option value="figure">Figura</option>
+          <option value="organizer">Organizador</option>
+          <option value="pot">Maceta</option>
+          <option value="custom">Personalizado</option>
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Orden</label>
+        <input type="number" className={inputCls} value={item.sortOrder ?? 0} onChange={(e) => f("sortOrder", parseInt(e.target.value) || 0)} />
+      </div>
+      <div className="flex items-center gap-2 mt-1">
+        <input type="checkbox" id="active-chk" checked={item.active ?? true} onChange={(e) => f("active", e.target.checked)} className="w-4 h-4 accent-primary" />
+        <label htmlFor="active-chk" className="font-mono text-xs text-muted-foreground">Visible en la web</label>
+      </div>
+      <div className="sm:col-span-2 flex gap-2 pt-2 border-t border-muted">
+        <button onClick={onSave} className="font-mono text-xs px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-all">
+          Guardar
+        </button>
+        <button onClick={onCancel} className="font-mono text-xs px-4 py-2 border border-muted text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-all">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AdminPage() {
   const [isAdmin, setIsAdmin]         = useState<boolean | null>(null);
   const [password, setPassword]       = useState("");
@@ -849,6 +982,11 @@ function AdminPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [copiedId, setCopiedId]       = useState<number | null>(null);
   const [toasts, setToasts]           = useState<ToastMsg[]>([]);
+  const [adminTab, setAdminTab]       = useState<"orders" | "catalog">("orders");
+  const [catalogItems, setCatalogItems] = useState<CatalogApiItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [editingCatalog, setEditingCatalog] = useState<CatalogApiItem | null>(null);
+  const [newItem, setNewItem]         = useState<Partial<CatalogApiItem> | null>(null);
 
   const toast = (msg: string, type: "ok" | "err" = "ok") => {
     const id = ++toastId;
@@ -864,6 +1002,7 @@ function AdminPage() {
   }, []);
 
   useEffect(() => { if (isAdmin) loadOrders(); }, [isAdmin]);
+  useEffect(() => { if (isAdmin && adminTab === "catalog") loadCatalog(); }, [isAdmin, adminTab]);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -914,6 +1053,38 @@ function AdminPage() {
     navigator.clipboard.writeText(contact).then(() => {
       setCopiedId(id); setTimeout(() => setCopiedId(null), 2000); toast("Contacto copiado");
     });
+  };
+
+  const loadCatalog = async () => {
+    setCatalogLoading(true);
+    try {
+      const r = await fetch("/api/catalog/all", { credentials: "include" });
+      if (r.ok) setCatalogItems(await r.json() as CatalogApiItem[]);
+    } finally { setCatalogLoading(false); }
+  };
+
+  const saveCatalogItem = async (item: Partial<CatalogApiItem>) => {
+    if (item.id !== undefined && item.id > 0) {
+      const r = await fetch(`/api/catalog/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(item) });
+      if (r.ok) { setEditingCatalog(null); await loadCatalog(); toast("Producto actualizado"); }
+      else toast("Error al guardar", "err");
+    } else {
+      const r = await fetch("/api/catalog", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(item) });
+      if (r.ok) { setNewItem(null); await loadCatalog(); toast("Producto añadido"); }
+      else toast("Error al añadir", "err");
+    }
+  };
+
+  const deleteCatalogItem = async (id: number) => {
+    const r = await fetch(`/api/catalog/${id}`, { method: "DELETE", credentials: "include" });
+    if (r.ok) { setCatalogItems((p) => p.filter((x) => x.id !== id)); toast("Producto eliminado"); }
+    else toast("Error al eliminar", "err");
+  };
+
+  const toggleActive = async (item: CatalogApiItem) => {
+    const r = await fetch(`/api/catalog/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ active: !item.active }) });
+    if (r.ok) setCatalogItems((p) => p.map((x) => x.id === item.id ? { ...x, active: !item.active } : x));
+    else toast("Error al cambiar visibilidad", "err");
   };
 
   if (isAdmin === null) return (
@@ -989,6 +1160,91 @@ function AdminPage() {
       </nav>
 
       <div className="max-w-5xl mx-auto px-6 py-8">
+
+        {/* Main tab switcher */}
+        <div className="flex border border-muted rounded-none overflow-hidden mb-8 w-fit">
+          {([
+            { key: "orders",  label: "Encargos" },
+            { key: "catalog", label: "Catálogo" },
+          ] as const).map((t) => (
+            <button key={t.key} onClick={() => setAdminTab(t.key)}
+              className={`font-mono text-sm px-5 py-2.5 transition-colors border-r border-muted last:border-r-0 ${adminTab === t.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/30"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Catalog tab */}
+        {adminTab === "catalog" && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-mono text-lg font-bold">Gestión de catálogo</h2>
+              <button onClick={() => { setNewItem({ name: "", description: "", detail: "", price: "", badge: "", badgeVariant: "orange", iconType: "custom", active: true, sortOrder: catalogItems.length }); setEditingCatalog(null); }}
+                className="font-mono text-xs px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 transition-all">
+                + Nuevo producto
+              </button>
+            </div>
+
+            {/* New item form */}
+            {newItem && (
+              <div className="border border-primary/40 bg-card p-5 mb-6">
+                <p className="font-mono text-xs text-primary uppercase tracking-widest mb-4">Nuevo producto</p>
+                <CatalogItemForm item={newItem} onChange={setNewItem} onSave={() => saveCatalogItem(newItem)} onCancel={() => setNewItem(null)} />
+              </div>
+            )}
+
+            {catalogLoading ? (
+              <div className="flex items-center gap-2 font-mono text-sm text-muted-foreground py-8">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                Cargando catálogo...
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {catalogItems.map((item) => (
+                  <div key={item.id} className="border border-muted bg-card">
+                    {editingCatalog?.id === item.id ? (
+                      <div className="p-5">
+                        <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest mb-4">Editando: {item.name}</p>
+                        <CatalogItemForm item={editingCatalog} onChange={(v) => setEditingCatalog(v as CatalogApiItem)} onSave={() => saveCatalogItem(editingCatalog)} onCancel={() => setEditingCatalog(null)} />
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4 p-4">
+                        <div className="shrink-0 text-muted-foreground/60">{CATALOG_ICONS[item.iconType] ?? CATALOG_ICONS["custom"]}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-mono font-bold text-sm truncate">{item.name}</span>
+                            <span className={`font-mono text-xs px-1.5 py-0.5 border ${badgeClass(item.badgeVariant)}`}>{item.badge}</span>
+                            {!item.active && <span className="font-mono text-xs text-muted-foreground border border-muted px-1.5 py-0.5">oculto</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+                        </div>
+                        <div className="shrink-0 font-mono font-bold text-primary">{item.price}</div>
+                        <div className="shrink-0 flex items-center gap-1">
+                          <button onClick={() => toggleActive(item)} title={item.active ? "Ocultar" : "Mostrar"}
+                            className={`font-mono text-xs px-2.5 py-1.5 border transition-all ${item.active ? "border-secondary/40 text-secondary hover:bg-secondary/10" : "border-muted text-muted-foreground hover:text-foreground"}`}>
+                            {item.active ? "Visible" : "Oculto"}
+                          </button>
+                          <button onClick={() => { setEditingCatalog({ ...item }); setNewItem(null); }}
+                            className="font-mono text-xs px-2.5 py-1.5 border border-muted text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-all">
+                            Editar
+                          </button>
+                          <button onClick={() => deleteCatalogItem(item.id)}
+                            className="font-mono text-xs px-2.5 py-1.5 border border-red-400/30 text-red-400 hover:bg-red-400/10 transition-all">
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Orders tab */}
+        {adminTab === "orders" && (
+        <div>
 
         {/* Stats cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
@@ -1173,6 +1429,9 @@ function AdminPage() {
             })}
           </div>
         )}
+        </div>
+        )}
+
       </div>
     </div>
   );
@@ -1188,8 +1447,7 @@ function Footer() {
           poisow 3d
         </div>
         <div className="flex items-center gap-4 text-sm font-mono text-muted-foreground">
-          <MapPin className="w-3.5 h-3.5" />
-          Bilbao, España
+          <span>Piezas 3D personalizadas</span>
         </div>
         <a data-testid="link-footer-instagram" href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors font-mono text-sm">
           <SiInstagram className="w-5 h-5" />
@@ -1198,7 +1456,7 @@ function Footer() {
       </div>
       <div className="max-w-6xl mx-auto mt-8 flex flex-col md:flex-row justify-between items-center gap-2 text-xs text-muted-foreground/40 font-mono">
         <span>© {new Date().getFullYear()} poisow 3d. Todos los derechos reservados.</span>
-        <span>Impresión 3D · Piezas personalizadas · Bilbao</span>
+        <span>Impresión 3D · Piezas personalizadas</span>
       </div>
     </footer>
   );
@@ -1219,9 +1477,9 @@ function Home() {
       <Navbar onOrderClick={() => openOrder()} />
       <main>
         <Hero onOrderClick={() => openOrder()} />
-        <Catalog onOrderClick={(p) => openOrder(p)} />
         <HowItWorks />
         <CustomOrder onOrderClick={() => openOrder()} />
+        <Catalog onOrderClick={(p) => openOrder(p)} />
         <Materials />
         <FaqSection />
       </main>
