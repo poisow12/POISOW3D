@@ -1,3 +1,4 @@
+const API = import.meta.env.VITE_API_URL || "";
 import React, { useState, useEffect, useRef } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -342,7 +343,7 @@ function OrderModal({ open, onClose, productName = "" }: OrderModalProps) {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch("/api/orders", {
+      const res = await fetch(API + "/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -584,7 +585,7 @@ function Catalog({ onOrderClick }: { onOrderClick: (p: string) => void }) {
   const [products, setProducts] = useState<CatalogApiItem[]>(STATIC_PRODUCTS);
 
   useEffect(() => {
-    fetch("/api/catalog")
+    fetch(API + "/api/catalog")
       .then((r) => r.ok ? r.json() : null)
       .then((data: CatalogApiItem[] | null) => { if (data && data.length > 0) setProducts(data); })
       .catch(() => {/* keep static fallback */});
@@ -995,7 +996,7 @@ function AdminPage() {
   };
 
   useEffect(() => {
-    fetch("/api/auth/me", { credentials: "include" })
+    fetch(API + "/api/auth/me", { credentials: "include" })
       .then((r) => r.json())
       .then((d: { isAdmin: boolean }) => setIsAdmin(d.isAdmin))
       .catch(() => setIsAdmin(false));
@@ -1007,7 +1008,7 @@ function AdminPage() {
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const r = await fetch("/api/orders", { credentials: "include" });
+      const r = await fetch(API + "/api/orders", { credentials: "include" });
       if (r.ok) {
         const data = await r.json() as Order[];
         setOrders(data);
@@ -1020,31 +1021,31 @@ function AdminPage() {
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault(); setLoginError("");
-    const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ password }) });
+    const r = await fetch(API + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ password }) });
     if (r.ok) { setIsAdmin(true); } else { setLoginError("Contraseña incorrecta"); }
   };
 
   const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    await fetch(API + "/api/auth/logout", { method: "POST", credentials: "include" });
     setIsAdmin(false); setOrders([]);
   };
 
   const updateStatus = async (id: number, status: string) => {
-    const r = await fetch(`/api/orders/${id}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ status }) });
+    const r = await fetch(`${API}/api/orders/${id}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ status }) });
     if (r.ok) { setOrders((p) => p.map((o) => o.id === id ? { ...o, status } : o)); toast(`Estado → ${STATUS_LABELS[status]?.label ?? status}`); }
     else toast("Error al cambiar estado", "err");
   };
 
   const saveNote = async (id: number) => {
     setSavingNote(id);
-    const r = await fetch(`/api/orders/${id}/note`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ notes: noteMap[id] ?? "" }) });
+    const r = await fetch(`${API}/api/orders/${id}/note`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ notes: noteMap[id] ?? "" }) });
     setSavingNote(null);
     if (r.ok) { setOrders((p) => p.map((o) => o.id === id ? { ...o, notes: noteMap[id] ?? "" } : o)); toast("Nota guardada"); }
     else toast("Error al guardar nota", "err");
   };
 
   const deleteOrder = async (id: number) => {
-    const r = await fetch(`/api/orders/${id}`, { method: "DELETE", credentials: "include" });
+    const r = await fetch(`${API}/api/orders/${id}`, { method: "DELETE", credentials: "include" });
     if (r.ok) { setOrders((p) => p.filter((o) => o.id !== id)); setDeleteConfirm(null); toast("Encargo eliminado"); }
     else toast("Error al eliminar", "err");
   };
@@ -1058,31 +1059,31 @@ function AdminPage() {
   const loadCatalog = async () => {
     setCatalogLoading(true);
     try {
-      const r = await fetch("/api/catalog/all", { credentials: "include" });
+      const r = await fetch(API + "/api/catalog/all", { credentials: "include" });
       if (r.ok) setCatalogItems(await r.json() as CatalogApiItem[]);
     } finally { setCatalogLoading(false); }
   };
 
   const saveCatalogItem = async (item: Partial<CatalogApiItem>) => {
     if (item.id !== undefined && item.id > 0) {
-      const r = await fetch(`/api/catalog/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(item) });
+      const r = await fetch(`${API}/api/catalog/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(item) });
       if (r.ok) { setEditingCatalog(null); await loadCatalog(); toast("Producto actualizado"); }
       else toast("Error al guardar", "err");
     } else {
-      const r = await fetch("/api/catalog", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(item) });
+      const r = await fetch(API + "/api/catalog", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(item) });
       if (r.ok) { setNewItem(null); await loadCatalog(); toast("Producto añadido"); }
       else toast("Error al añadir", "err");
     }
   };
 
   const deleteCatalogItem = async (id: number) => {
-    const r = await fetch(`/api/catalog/${id}`, { method: "DELETE", credentials: "include" });
+    const r = await fetch(`${API}/api/catalog/${id}`, { method: "DELETE", credentials: "include" });
     if (r.ok) { setCatalogItems((p) => p.filter((x) => x.id !== id)); toast("Producto eliminado"); }
     else toast("Error al eliminar", "err");
   };
 
   const toggleActive = async (item: CatalogApiItem) => {
-    const r = await fetch(`/api/catalog/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ active: !item.active }) });
+    const r = await fetch(`${API}/api/catalog/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ active: !item.active }) });
     if (r.ok) setCatalogItems((p) => p.map((x) => x.id === item.id ? { ...x, active: !item.active } : x));
     else toast("Error al cambiar visibilidad", "err");
   };
