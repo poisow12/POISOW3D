@@ -1,0 +1,11 @@
+cat > ~/workspace/render.yaml << 'EOF'
+services:
+  - type: web
+    name: poisow3d-web
+    env: static
+    buildCommand: cd artifacts/capas3d && pnpm install && pnpm run build
+    staticPublishPath: artifacts/capas3d/dist/public
+    envVars:
+      - key: VITE_API_URL
+        value: https://poisow3d-api.onrender.com
+EOF
