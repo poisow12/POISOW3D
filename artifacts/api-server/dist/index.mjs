@@ -57894,7 +57894,7 @@ app.use("/api", routes_default);
 var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
 var frontendPath = path.resolve(__dirname2, "../../capas3d/dist/public");
 app.use(import_express6.default.static(frontendPath));
-app.get("*", (_req, res) => {
+app.get("/{*splat}", (_req, res) => {
   res.sendFile(path.join(frontendPath, "index.html"));
 });
 var app_default = app;
