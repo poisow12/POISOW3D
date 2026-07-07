@@ -23,15 +23,10 @@ const INSTAGRAM_URL = "https://www.instagram.com/poisow3d/";
 function LogoMark({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      {/* Bottom layer */}
       <path d="M4 22 L16 28 L28 22 L16 16 Z" fill="#3F3F46" />
-      {/* Middle layer */}
       <path d="M4 16 L16 22 L28 16 L16 10 Z" fill="#52525B" />
-      {/* Top layer - orange accent */}
       <path d="M4 10 L16 16 L28 10 L16 4 Z" fill="#FF5A2A" />
-      {/* Left face bottom */}
       <path d="M4 16 L4 22 L16 28 L16 22 Z" fill="#27272A" />
-      {/* Right face bottom */}
       <path d="M28 16 L28 22 L16 28 L16 22 Z" fill="#3F3F46" />
     </svg>
   );
@@ -55,11 +50,8 @@ function PrinterVisual() {
 
   const LOOP_MS = 12000;
   const t = (rawMs % LOOP_MS) / LOOP_MS;
-  // Fast pulse for nozzle glow (every 800ms)
   const glowPulse = 0.55 + 0.45 * Math.sin((rawMs % 800) / 800 * Math.PI * 2);
-  // Slower bed heat pulse (every 2400ms)
   const bedPulse = 0.04 + 0.03 * Math.sin((rawMs % 2400) / 2400 * Math.PI * 2);
-  // Fan rotation angle
   const fanAngle = (rawMs / 4) % 360;
 
   const NUM_LAYERS = 7;
@@ -72,7 +64,6 @@ function PrinterVisual() {
   const layerIdx = Math.min(Math.floor(totalPhase), NUM_LAYERS - 1);
   const layerProg = totalPhase - Math.floor(totalPhase);
 
-  // Printer geometry
   const POST_L = 28;
   const POST_R = 308;
   const FRAME_TOP = 10;
@@ -81,7 +72,7 @@ function PrinterVisual() {
   const PR = 270;
   const PW = PR - PL;
   const NOZZLE_DROP = 42;
-  const DEPTH_X = 22;  // isometric depth for 3D object
+  const DEPTH_X = 22;
   const DEPTH_Y = 11;
 
   const goingRight = layerIdx % 2 === 0;
@@ -132,53 +123,34 @@ function PrinterVisual() {
           </filter>
         </defs>
 
-        {/* ── FRAME POSTS ── */}
         <rect x={POST_L} y={FRAME_TOP} width="12" height="240" rx="2" fill="url(#postG)" />
         <rect x={POST_L + 2} y={FRAME_TOP + 2} width="2" height="236" fill="#52525B" opacity="0.3" />
         <rect x={POST_R - 12} y={FRAME_TOP} width="12" height="240" rx="2" fill="#27272A" />
         <rect x={POST_R - 5} y={FRAME_TOP + 2} width="2" height="236" fill="#52525B" opacity="0.25" />
-
-        {/* Top bar */}
         <rect x={POST_L} y={FRAME_TOP} width={POST_R - POST_L} height="10" rx="2" fill="#3F3F46" />
         <rect x={POST_L + 3} y={FRAME_TOP + 2} width={POST_R - POST_L - 6} height="3.5" rx="1" fill="#52525B" opacity="0.4" />
-
-        {/* Feet */}
         <rect x={POST_L - 8} y={250} width="40" height="8" rx="2" fill="#27272A" />
         <rect x={POST_L - 8} y={248} width="40" height="4" rx="1" fill="#3F3F46" />
         <rect x={POST_R - 32} y={250} width="40" height="8" rx="2" fill="#27272A" />
         <rect x={POST_R - 32} y={248} width="40" height="4" rx="1" fill="#3F3F46" />
-
-        {/* Lead screws */}
         <rect x={POST_L + 4} y={FRAME_TOP + 12} width="3" height="226" fill="#52525B" opacity="0.45" />
         <rect x={POST_R - 7} y={FRAME_TOP + 12} width="3" height="226" fill="#52525B" opacity="0.45" />
-        {/* Screw thread marks */}
         {Array.from({ length: 18 }, (_, i) => (
           <line key={i} x1={POST_L + 4} y1={FRAME_TOP + 14 + i * 12} x2={POST_L + 7} y2={FRAME_TOP + 14 + i * 12}
             stroke="#71717A" strokeWidth="0.5" opacity="0.4" />
         ))}
-
-        {/* ── LCD SCREEN ── */}
         <rect x={POST_L + 16} y={FRAME_TOP + 2} width="56" height="32" rx="2" fill="#080E08" stroke="#3F3F46" strokeWidth="0.8" />
         <rect x={POST_L + 18} y={FRAME_TOP + 4} width="52" height="28" rx="1" fill="#060D06" />
-        {/* Screen content */}
         <text x={POST_L + 20} y={FRAME_TOP + 12} fontFamily="monospace" fontSize="4.5" fill="#9FD356" letterSpacing="0.3">poisow 3d</text>
         <text x={POST_L + 20} y={FRAME_TOP + 19} fontFamily="monospace" fontSize="3.8" fill="#5A8A3A" letterSpacing="0.2">{`T:210 B:60°C`}</text>
-        {/* Progress bar track */}
         <rect x={POST_L + 20} y={FRAME_TOP + 22} width="46" height="3.5" rx="1.5" fill="#122212" />
-        {/* Progress fill */}
         <rect x={POST_L + 20} y={FRAME_TOP + 22} width={46 * t} height="3.5" rx="1.5" fill="#9FD356" />
-        {/* LCD glare */}
         <rect x={POST_L + 18} y={FRAME_TOP + 4} width="14" height="28" rx="1" fill="white" opacity="0.025" />
         <text x={POST_L + 20} y={FRAME_TOP + 30} fontFamily="monospace" fontSize="3.5" fill="#4A6A3A">{pct}% complet.</text>
-
-        {/* ── FILAMENT SPOOL ── */}
         <circle cx={POST_R + 26} cy={FRAME_TOP + 36} r="26" fill="#1A1A1D" stroke="#3F3F46" strokeWidth="1.5" />
-        {/* Wound filament */}
         <circle cx={POST_R + 26} cy={FRAME_TOP + 36} r="22" fill="none" stroke="#FF5A2A" strokeWidth="5" strokeDasharray="60 12" opacity="0.7" />
         <circle cx={POST_R + 26} cy={FRAME_TOP + 36} r="16" fill="none" stroke="#CC3A11" strokeWidth="3" strokeDasharray="40 10" opacity="0.45" />
-        {/* Hub */}
         <circle cx={POST_R + 26} cy={FRAME_TOP + 36} r="8" fill="#27272A" stroke="#3F3F46" strokeWidth="1" />
-        {/* Hub spokes */}
         {[0, 60, 120, 180, 240, 300].map(deg => {
           const rad = deg * Math.PI / 180;
           return <line key={deg}
@@ -187,85 +159,49 @@ function PrinterVisual() {
             stroke="#52525B" strokeWidth="1" />;
         })}
         <circle cx={POST_R + 26} cy={FRAME_TOP + 36} r="3" fill="#3F3F46" />
-
-        {/* PTFE tube from spool to carriage */}
         <path d={`M${POST_R + 8} ${FRAME_TOP + 24} C${nozzleX + 60} ${gantryY - 50} ${nozzleX + 30} ${gantryY - 22} ${nozzleX + 10} ${gantryY + 2}`}
           stroke="#D4D4D8" strokeWidth="2.5" strokeDasharray="6 3" opacity="0.25" fill="none" />
-
-        {/* ── HEATED BED ── */}
-        {/* Bed carriage rails */}
         <rect x="44" y={BED_TOP + 7} width={POST_R - 44 + 12} height="8" rx="1" fill="#1E1E22" />
-        {/* Bed heater PCB */}
         <rect x="52" y={BED_TOP + 1} width={PW + 16} height="8" rx="1" fill="#2A2A32" />
-        {/* Glass/PEI sheet */}
         <rect x="55" y={BED_TOP - 4} width={PW + 10} height="7" rx="0.5" fill="#48484F" />
-        {/* Glass highlight */}
         <rect x="56" y={BED_TOP - 4} width="30" height="7" rx="0.5" fill="white" opacity="0.04" />
-        {/* Bed grid lines */}
         {[PL + 20, PL + 46, PL + 72, PL + 98, PL + 124, PL + 150, PL + 176].map(gx => (
           <line key={gx} x1={gx} y1={BED_TOP - 4} x2={gx} y2={BED_TOP + 3} stroke="#3A3A42" strokeWidth="0.7" />
         ))}
-        {/* Bed heat glow */}
         <ellipse cx={(PL + PR) / 2} cy={BED_TOP} rx={PW / 2} ry="6" fill="url(#bedGlowG)" />
-
-        {/* ── 3D PRINTED OBJECT ── */}
-        {/* Completed layers — isometric style with front + right face + top cap */}
         {Array.from({ length: completedLayerCount }, (_, i) => {
           const ty = layerTopY(i);
           const fc = layerFrontColor(i);
           const sc = layerSideColor(i);
           return (
             <g key={i}>
-              {/* Front face */}
               <rect x={PL} y={ty} width={PW} height={LAYER_H} fill={fc} />
-              {/* Highlight stripe */}
               <rect x={PL} y={ty} width={PW} height="1.5" fill="white" opacity="0.09" />
-              {/* Shadow stripe */}
               <rect x={PL} y={ty + LAYER_H - 1} width={PW} height="1" fill="black" opacity="0.2" />
-              {/* Right face (isometric depth) */}
-              <polygon
-                points={`${PR},${ty} ${PR + DEPTH_X},${ty - DEPTH_Y} ${PR + DEPTH_X},${ty + LAYER_H - DEPTH_Y} ${PR},${ty + LAYER_H}`}
-                fill={sc} />
-              {/* Right face highlight */}
-              <polygon
-                points={`${PR},${ty} ${PR + DEPTH_X},${ty - DEPTH_Y} ${PR + DEPTH_X},${ty - DEPTH_Y + 1.5} ${PR},${ty + 1.5}`}
-                fill="white" opacity="0.06" />
+              <polygon points={`${PR},${ty} ${PR + DEPTH_X},${ty - DEPTH_Y} ${PR + DEPTH_X},${ty + LAYER_H - DEPTH_Y} ${PR},${ty + LAYER_H}`} fill={sc} />
+              <polygon points={`${PR},${ty} ${PR + DEPTH_X},${ty - DEPTH_Y} ${PR + DEPTH_X},${ty - DEPTH_Y + 1.5} ${PR},${ty + 1.5}`} fill="white" opacity="0.06" />
             </g>
           );
         })}
-
-        {/* Top cap of completed object */}
         {completedLayerCount > 0 && (
           <polygon
             points={`${PL},${layerTopY(completedLayerCount - 1)} ${PL + DEPTH_X},${layerTopY(completedLayerCount - 1) - DEPTH_Y} ${PR + DEPTH_X},${layerTopY(completedLayerCount - 1) - DEPTH_Y} ${PR},${layerTopY(completedLayerCount - 1)}`}
             fill={layerTopColor} opacity="0.75" />
         )}
-
-        {/* Current partial layer */}
         {isPrinting && curLayerW > 1 && (
           <g>
             <rect x={curLayerX} y={currentTopY} width={curLayerW} height={LAYER_H} fill={layerFrontColor(layerIdx)} />
             <rect x={curLayerX} y={currentTopY} width={curLayerW} height="1.5" fill="white" opacity="0.12" />
-            {/* Freshly extruded glow on the new layer */}
             <rect x={curLayerX} y={currentTopY} width={curLayerW} height={LAYER_H} fill="#FF7A50" opacity="0.18" />
           </g>
         )}
-
-        {/* ── GANTRY / X-AXIS BEAM ── */}
         <rect x={POST_L + 12} y={gantryY} width={POST_R - POST_L - 24} height="10" rx="1.5" fill="url(#gantryG)" />
         <rect x={POST_L + 12} y={gantryY + 1} width={POST_R - POST_L - 24} height="3" rx="0.5" fill="#71717A" opacity="0.35" />
         <rect x={POST_L + 12} y={gantryY + 4} width={POST_R - POST_L - 24} height="1.5" rx="0.5" fill="#18181B" opacity="0.5" />
-
-        {/* ── PRINT CARRIAGE ── */}
-        {/* Main body */}
         <rect x={nozzleX - 19} y={gantryY - 4} width="38" height="22" rx="3" fill="#1E1E24" stroke="#3A3A42" strokeWidth="0.8" />
-        {/* Top clamp */}
         <rect x={nozzleX - 16} y={gantryY - 2} width="32" height="8" rx="2" fill="#3A3A42" />
         <rect x={nozzleX - 14} y={gantryY} width="28" height="4" rx="1" fill="#4A4A52" opacity="0.6" />
-
-        {/* Fan housing */}
         <rect x={nozzleX - 17} y={gantryY + 8} width="14" height="13" rx="2" fill="#141418" stroke="#28282E" strokeWidth="0.5" />
-        {/* Fan blades (rotating) */}
         {[0, 60, 120, 180, 240, 300].map(deg => {
           const rad = (deg + fanAngle) * Math.PI / 180;
           return <line key={deg}
@@ -275,43 +211,25 @@ function PrinterVisual() {
         })}
         <circle cx={nozzleX - 10} cy={gantryY + 14.5} r="6" stroke="#28282E" strokeWidth="0.8" fill="none" />
         <circle cx={nozzleX - 10} cy={gantryY + 14.5} r="2" fill="#1A1A20" />
-
-        {/* Heat break / cold end */}
         <rect x={nozzleX - 2} y={gantryY + 6} width="7" height="12" rx="1" fill="#27272A" stroke="#3A3A42" strokeWidth="0.5" />
-        {/* Fins on heat break */}
         {[0, 3, 6, 9].map(fi => (
           <rect key={fi} x={nozzleX - 4} y={gantryY + 7 + fi} width="11" height="1.5" rx="0.5" fill="#3A3A42" />
         ))}
-
-        {/* Heater block */}
         <rect x={nozzleX - 4} y={gantryY + 18} width="11" height="10" rx="1.5" fill="#C02800" />
         <rect x={nozzleX - 3} y={gantryY + 19} width="9" height="8" rx="1" fill="#E03200" opacity="0.8" />
-        {/* Heater glow overlay */}
         <rect x={nozzleX - 4} y={gantryY + 18} width="11" height="10" rx="1.5" fill="#FF5A2A" opacity={glowPulse * 0.3} />
-        {/* Thermistor wire */}
         <path d={`M${nozzleX + 6} ${gantryY + 22} C${nozzleX + 14} ${gantryY + 20} ${nozzleX + 18} ${gantryY + 10} ${nozzleX + 18} ${gantryY}`}
           stroke="#D4D4D8" strokeWidth="0.8" fill="none" opacity="0.4" />
-
-        {/* Nozzle */}
         <path d={`M${nozzleX - 3} ${gantryY + 28} L${nozzleX + 3} ${gantryY + 28} L${nozzleX + 1.5} ${gantryY + 38} L${nozzleX - 1.5} ${gantryY + 38} Z`} fill="#6A6A72" />
         <path d={`M${nozzleX - 1.5} ${gantryY + 38} L${nozzleX + 1.5} ${gantryY + 38} L${nozzleX + 0.8} ${gantryY + 41} L${nozzleX - 0.8} ${gantryY + 41} Z`} fill="#A1A1AA" />
-
-        {/* ── NOZZLE GLOW ── */}
-        {/* Wide ambient glow */}
         <circle cx={nozzleX} cy={nozzleTipY} r="24" fill="url(#nozzleGlowG)" />
-        {/* Mid ring */}
         <circle cx={nozzleX} cy={nozzleTipY} r="8" fill="#FF5A2A" opacity={glowPulse * 0.2} />
-        {/* Hot tip */}
         <circle cx={nozzleX} cy={nozzleTipY} r="3.5" fill="#FF5A2A" opacity={0.8 + glowPulse * 0.2} filter="url(#glow)" />
         <circle cx={nozzleX} cy={nozzleTipY} r="1.5" fill="white" opacity={0.5 + glowPulse * 0.35} />
-
-        {/* Extrusion thread */}
         {isPrinting && curLayerW > 2 && (
           <line x1={nozzleX} y1={nozzleTipY} x2={nozzleX} y2={currentTopY}
             stroke="#FF7A50" strokeWidth="2" opacity={0.5 + glowPulse * 0.3} />
         )}
-
-        {/* Layer glow at current print position */}
         {isPrinting && (
           <ellipse cx={nozzleX} cy={currentTopY + 2} rx="14" ry="5" fill="url(#layerGlowG)" opacity={glowPulse * 0.8} />
         )}
@@ -456,18 +374,14 @@ function Hero({ onOrderClick }: { onOrderClick: () => void }) {
           <h1 className="font-mono text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05] text-foreground">
             Tu idea,<br />impresa<br /><span className="text-primary">capa a capa.</span>
           </h1>
-
           <p className="text-muted-foreground text-lg max-w-md leading-relaxed">
             Piezas 3D personalizadas impresas con precisión. Hablas directamente conmigo, sin formularios perdidos ni esperas innecesarias.
           </p>
-
-          {/* Trust signals */}
           <div className="flex flex-wrap gap-4 text-xs font-mono text-muted-foreground">
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-secondary" /> Respuesta en 24h</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-secondary" /> Precio cerrado antes de imprimir</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-secondary" /> Envío o recogida en mano</span>
           </div>
-
           <div className="flex flex-wrap items-center gap-4 pt-2">
             <Button data-testid="button-hero-order" size="lg" className="font-mono bg-primary text-primary-foreground hover:bg-primary/90 rounded-none" onClick={onOrderClick}>
               Pedir encargo <ArrowRight className="ml-2 w-4 h-4" />
@@ -477,7 +391,6 @@ function Hero({ onOrderClick }: { onOrderClick: () => void }) {
             </Button>
           </div>
         </div>
-
         <div className="flex-1 w-full bg-card border border-muted relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,90,42,0.06)_0%,transparent_70%)]" />
           <PrinterVisual />
@@ -561,18 +474,19 @@ type CatalogApiItem = {
   badge: string;
   badgeVariant: string;
   iconType: string;
+  imageUrl: string;
   active: boolean;
   sortOrder: number;
   createdAt: string;
 };
 
 const STATIC_PRODUCTS: CatalogApiItem[] = [
-  { id: 0, name: "Llavero personalizado",    description: "Con tu nombre, iniciales, logo o diseño favorito. Pequeño, ligero y resistente.", detail: "Perfecto como regalo o para identificar tus llaves con estilo.",  price: "4,50€",    badge: "Más pedido",       badgeVariant: "orange", iconType: "keychain",  active: true, sortOrder: 0, createdAt: "" },
-  { id: 1, name: "Soporte de móvil",         description: "Para escritorio o uso vertical. Estable, con el ángulo que necesites.",           detail: "Diseño limpio que encaja en cualquier espacio de trabajo.",       price: "7€",       badge: "Popular",          badgeVariant: "green",  iconType: "phone",     active: true, sortOrder: 1, createdAt: "" },
-  { id: 2, name: "Figura gaming / meme",     description: "Personajes, logos, memes en 3D desde tu imagen o diseño. Cada pieza es única.",   detail: "Trae tu referencia y lo imprimimos tal cual.",                    price: "desde 6€", badge: "A medida",         badgeVariant: "orange", iconType: "figure",    active: true, sortOrder: 2, createdAt: "" },
-  { id: 3, name: "Organizador de escritorio",description: "Compartimentos para bolígrafos, cables, notas o lo que necesites tener a mano.", detail: "Las medidas y divisiones, a tu gusto.",                            price: "9€",       badge: "Personalizable",   badgeVariant: "green",  iconType: "organizer", active: true, sortOrder: 3, createdAt: "" },
-  { id: 4, name: "Maceta decorativa",        description: "Geométrica, moderna o con diseño propio. Para plantas pequeñas o suculentas.",    detail: "Con o sin agujero de drenaje, a elegir.",                         price: "desde 5€", badge: "Ecofriendly",      badgeVariant: "green",  iconType: "pot",       active: true, sortOrder: 4, createdAt: "" },
-  { id: 5, name: "Pieza a medida",           description: "¿Tienes un STL, una imagen o solo una idea? Lo imprimimos sin problema.",         detail: "Presupuesto sin compromiso antes de confirmar.",                  price: "Consultar",badge: "100% personalizado",badgeVariant: "orange", iconType: "custom",    active: true, sortOrder: 5, createdAt: "" },
+  { id: 0, name: "Llavero personalizado",    description: "Con tu nombre, iniciales, logo o diseño favorito. Pequeño, ligero y resistente.", detail: "Perfecto como regalo o para identificar tus llaves con estilo.",  price: "4,50€",    badge: "Más pedido",       badgeVariant: "orange", iconType: "keychain",  imageUrl: "", active: true, sortOrder: 0, createdAt: "" },
+  { id: 1, name: "Soporte de móvil",         description: "Para escritorio o uso vertical. Estable, con el ángulo que necesites.",           detail: "Diseño limpio que encaja en cualquier espacio de trabajo.",       price: "7€",       badge: "Popular",          badgeVariant: "green",  iconType: "phone",     imageUrl: "", active: true, sortOrder: 1, createdAt: "" },
+  { id: 2, name: "Figura gaming / meme",     description: "Personajes, logos, memes en 3D desde tu imagen o diseño. Cada pieza es única.",   detail: "Trae tu referencia y lo imprimimos tal cual.",                    price: "desde 6€", badge: "A medida",         badgeVariant: "orange", iconType: "figure",    imageUrl: "", active: true, sortOrder: 2, createdAt: "" },
+  { id: 3, name: "Organizador de escritorio",description: "Compartimentos para bolígrafos, cables, notas o lo que necesites tener a mano.", detail: "Las medidas y divisiones, a tu gusto.",                            price: "9€",       badge: "Personalizable",   badgeVariant: "green",  iconType: "organizer", imageUrl: "", active: true, sortOrder: 3, createdAt: "" },
+  { id: 4, name: "Maceta decorativa",        description: "Geométrica, moderna o con diseño propio. Para plantas pequeñas o suculentas.",    detail: "Con o sin agujero de drenaje, a elegir.",                         price: "desde 5€", badge: "Ecofriendly",      badgeVariant: "green",  iconType: "pot",       imageUrl: "", active: true, sortOrder: 4, createdAt: "" },
+  { id: 5, name: "Pieza a medida",           description: "¿Tienes un STL, una imagen o solo una idea? Lo imprimimos sin problema.",         detail: "Presupuesto sin compromiso antes de confirmar.",                  price: "Consultar",badge: "100% personalizado",badgeVariant: "orange", iconType: "custom",    imageUrl: "", active: true, sortOrder: 5, createdAt: "" },
 ];
 
 function badgeClass(variant: string) {
@@ -610,7 +524,13 @@ function Catalog({ onOrderClick }: { onOrderClick: (p: string) => void }) {
                 className="rounded-none border-muted bg-background hover:border-primary/60 transition-all duration-200 group flex flex-col h-full overflow-hidden"
               >
                 <div className="p-6 pb-4 bg-card border-b border-muted flex items-end justify-between">
-                  <div className="p-2">{CATALOG_ICONS[prod.iconType] ?? CATALOG_ICONS["custom"]}</div>
+                  <div className="p-2">
+                    {prod.imageUrl ? (
+                      <img src={prod.imageUrl} alt={prod.name} className="w-16 h-16 object-cover" />
+                    ) : (
+                      CATALOG_ICONS[prod.iconType] ?? CATALOG_ICONS["custom"]
+                    )}
+                  </div>
                   <Badge variant="outline" className={`font-mono text-xs rounded-none ${badgeClass(prod.badgeVariant)}`}>
                     {prod.badge}
                   </Badge>
@@ -658,18 +578,10 @@ function HowItWorks() {
       <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-muted-foreground mb-16 max-w-xl">
         Sencillo y sin complicaciones. De tu idea a tu puerta en unos pocos pasos.
       </motion.p>
-
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
         <div className="hidden md:block absolute top-8 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-muted to-transparent" />
         {steps.map((step, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.12 }}
-            className="relative"
-          >
+          <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.12 }} className="relative">
             <div className="w-16 h-16 border border-muted bg-card flex items-center justify-center mb-6">
               <span className="font-mono text-2xl font-black text-primary">{step.num}</span>
             </div>
@@ -710,8 +622,6 @@ function CustomOrder({ onOrderClick }: { onOrderClick: () => void }) {
               Pedir encargo <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </motion.div>
-
-          {/* Trust block */}
           <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="flex flex-col gap-4">
             {[
               { icon: <Clock className="w-5 h-5 text-primary" />, title: "Respuesta en menos de 24h", desc: "Te confirmo si puedo hacerlo y a qué precio antes de que pasen 24 horas." },
@@ -735,34 +645,10 @@ function CustomOrder({ onOrderClick }: { onOrderClick: () => void }) {
 
 /* ─── Materials ──────────────────────────────────────────────────────────── */
 const MATERIALS = [
-  {
-    name: "PLA",
-    tag: "El más común",
-    desc: "Versátil y con acabado muy limpio. Ideal para decoración, figuras y accesorios del día a día. Amplia gama de colores.",
-    accent: "bg-secondary",
-    pros: ["Buen acabado", "Colores vivos", "Fácil de limpiar"],
-  },
-  {
-    name: "PETG",
-    tag: "Resistente",
-    desc: "Aguanta calor y humedad mejor que el PLA. Perfecto para piezas funcionales, de exterior o que estén en contacto con agua.",
-    accent: "bg-blue-400",
-    pros: ["Resistente al calor", "Soporta humedad", "Alta durabilidad"],
-  },
-  {
-    name: "TPU",
-    tag: "Flexible",
-    desc: "Filamento elástico y blando. Para fundas de móvil, protectores, juntas y cualquier pieza que necesite flexibilidad.",
-    accent: "bg-primary",
-    pros: ["Elástico y suave", "Absorbe impactos", "Resistente al desgaste"],
-  },
-  {
-    name: "ABS",
-    tag: "Técnico",
-    desc: "Alta resistencia mecánica y térmica. Para piezas que trabajan en entornos exigentes o requieren mecanizado posterior.",
-    accent: "bg-zinc-400",
-    pros: ["Alta resistencia", "Fácil de lijar", "Acabado liso"],
-  }
+  { name: "PLA", tag: "El más común", desc: "Versátil y con acabado muy limpio. Ideal para decoración, figuras y accesorios del día a día. Amplia gama de colores.", accent: "bg-secondary", pros: ["Buen acabado", "Colores vivos", "Fácil de limpiar"] },
+  { name: "PETG", tag: "Resistente", desc: "Aguanta calor y humedad mejor que el PLA. Perfecto para piezas funcionales, de exterior o que estén en contacto con agua.", accent: "bg-blue-400", pros: ["Resistente al calor", "Soporta humedad", "Alta durabilidad"] },
+  { name: "TPU", tag: "Flexible", desc: "Filamento elástico y blando. Para fundas de móvil, protectores, juntas y cualquier pieza que necesite flexibilidad.", accent: "bg-primary", pros: ["Elástico y suave", "Absorbe impactos", "Resistente al desgaste"] },
+  { name: "ABS", tag: "Técnico", desc: "Alta resistencia mecánica y térmica. Para piezas que trabajan en entornos exigentes o requieren mecanizado posterior.", accent: "bg-zinc-400", pros: ["Alta resistencia", "Fácil de lijar", "Acabado liso"] },
 ];
 
 function Materials() {
@@ -890,7 +776,6 @@ function exportCsv(orders: Order[]) {
   a.click(); URL.revokeObjectURL(url);
 }
 
-/* Toast system */
 type ToastMsg = { id: number; msg: string; type: "ok" | "err" };
 let toastId = 0;
 
@@ -948,6 +833,10 @@ function CatalogItemForm({
           <option value="pot">Maceta</option>
           <option value="custom">Personalizado</option>
         </select>
+      </div>
+      <div className="sm:col-span-2">
+        <label className={labelCls}>URL de imagen (opcional)</label>
+        <input className={inputCls} value={item.imageUrl ?? ""} onChange={(e) => f("imageUrl", e.target.value)} placeholder="https://..." />
       </div>
       <div>
         <label className={labelCls}>Orden</label>
@@ -1129,7 +1018,6 @@ function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground dark">
-      {/* Toast stack */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => (
           <motion.div key={t.id} initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }}
@@ -1140,7 +1028,6 @@ function AdminPage() {
         ))}
       </div>
 
-      {/* Top nav */}
       <nav className="border-b border-muted bg-card/90 backdrop-blur-sm sticky top-0 z-40 px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2.5 font-mono text-sm font-bold">
           <LogoMark size={20} />
@@ -1161,8 +1048,6 @@ function AdminPage() {
       </nav>
 
       <div className="max-w-5xl mx-auto px-6 py-8">
-
-        {/* Main tab switcher */}
         <div className="flex border border-muted rounded-none overflow-hidden mb-8 w-fit">
           {([
             { key: "orders",  label: "Encargos" },
@@ -1175,18 +1060,16 @@ function AdminPage() {
           ))}
         </div>
 
-        {/* Catalog tab */}
         {adminTab === "catalog" && (
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-mono text-lg font-bold">Gestión de catálogo</h2>
-              <button onClick={() => { setNewItem({ name: "", description: "", detail: "", price: "", badge: "", badgeVariant: "orange", iconType: "custom", active: true, sortOrder: catalogItems.length }); setEditingCatalog(null); }}
+              <button onClick={() => { setNewItem({ name: "", description: "", detail: "", price: "", badge: "", badgeVariant: "orange", iconType: "custom", imageUrl: "", active: true, sortOrder: catalogItems.length }); setEditingCatalog(null); }}
                 className="font-mono text-xs px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 transition-all">
                 + Nuevo producto
               </button>
             </div>
 
-            {/* New item form */}
             {newItem && (
               <div className="border border-primary/40 bg-card p-5 mb-6">
                 <p className="font-mono text-xs text-primary uppercase tracking-widest mb-4">Nuevo producto</p>
@@ -1210,7 +1093,13 @@ function AdminPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-4 p-4">
-                        <div className="shrink-0 text-muted-foreground/60">{CATALOG_ICONS[item.iconType] ?? CATALOG_ICONS["custom"]}</div>
+                        <div className="shrink-0 text-muted-foreground/60">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover" />
+                          ) : (
+                            CATALOG_ICONS[item.iconType] ?? CATALOG_ICONS["custom"]
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <span className="font-mono font-bold text-sm truncate">{item.name}</span>
@@ -1243,196 +1132,173 @@ function AdminPage() {
           </div>
         )}
 
-        {/* Orders tab */}
         {adminTab === "orders" && (
         <div>
-
-        {/* Stats cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-          {([
-            { key: "all",         label: "Total",      color: "text-foreground",  bg: "border-muted" },
-            { key: "pending",     label: "Pendientes", color: "text-yellow-400",  bg: "border-yellow-400/20" },
-            { key: "in_progress", label: "En proceso", color: "text-blue-400",    bg: "border-blue-400/20" },
-            { key: "done",        label: "Listos",     color: "text-secondary",   bg: "border-secondary/20" },
-          ] as const).map((s) => (
-            <button key={s.key} onClick={() => setFilter(s.key)}
-              className={`text-left p-4 border-2 transition-all rounded-none bg-card ${filter === s.key ? "border-primary" : s.bg + " hover:border-muted-foreground/30"}`}>
-              <p className={`font-mono text-4xl font-black mb-1 ${s.color}`}>{counts[s.key]}</p>
-              <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest">{s.label}</p>
-              {s.key === "pending" && counts.pending > 0 && (
-                <p className="font-mono text-xs text-yellow-400/70 mt-1">requieren acción</p>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Search + filter bar */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text" placeholder="Buscar por nombre, producto, contacto..." value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-10 pl-9 pr-4 bg-card border border-muted font-mono text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 rounded-none"
-            />
-            {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
-          </div>
-          <div className="flex border border-muted rounded-none overflow-hidden">
-            {[
-              { key: "all", label: "Todos" },
-              { key: "pending", label: "Pendiente" },
-              { key: "in_progress", label: "Proceso" },
-              { key: "done", label: "Listo" },
-            ].map((tab) => (
-              <button key={tab.key} onClick={() => setFilter(tab.key)}
-                className={`font-mono text-xs px-3 py-2 transition-colors border-r border-muted last:border-r-0 ${filter === tab.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/30"}`}>
-                {tab.label}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+            {([
+              { key: "all",         label: "Total",      color: "text-foreground",  bg: "border-muted" },
+              { key: "pending",     label: "Pendientes", color: "text-yellow-400",  bg: "border-yellow-400/20" },
+              { key: "in_progress", label: "En proceso", color: "text-blue-400",    bg: "border-blue-400/20" },
+              { key: "done",        label: "Listos",     color: "text-secondary",   bg: "border-secondary/20" },
+            ] as const).map((s) => (
+              <button key={s.key} onClick={() => setFilter(s.key)}
+                className={`text-left p-4 border-2 transition-all rounded-none bg-card ${filter === s.key ? "border-primary" : s.bg + " hover:border-muted-foreground/30"}`}>
+                <p className={`font-mono text-4xl font-black mb-1 ${s.color}`}>{counts[s.key]}</p>
+                <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest">{s.label}</p>
+                {s.key === "pending" && counts.pending > 0 && (
+                  <p className="font-mono text-xs text-yellow-400/70 mt-1">requieren acción</p>
+                )}
               </button>
             ))}
           </div>
-        </div>
 
-        {/* Result count */}
-        <p className="font-mono text-xs text-muted-foreground/50 mb-4">
-          {filtered.length} encargo{filtered.length !== 1 ? "s" : ""}{search ? ` · búsqueda: "${search}"` : ""}
-        </p>
-
-        {/* List */}
-        {loading ? (
-          <div className="flex flex-col gap-3">
-            {[1,2,3].map((i) => <div key={i} className="h-28 border border-muted bg-card animate-pulse" />)}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input type="text" placeholder="Buscar por nombre, producto, contacto..." value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full h-10 pl-9 pr-4 bg-card border border-muted font-mono text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 rounded-none" />
+              {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
+            </div>
+            <div className="flex border border-muted rounded-none overflow-hidden">
+              {[
+                { key: "all", label: "Todos" },
+                { key: "pending", label: "Pendiente" },
+                { key: "in_progress", label: "Proceso" },
+                { key: "done", label: "Listo" },
+              ].map((tab) => (
+                <button key={tab.key} onClick={() => setFilter(tab.key)}
+                  className={`font-mono text-xs px-3 py-2 transition-colors border-r border-muted last:border-r-0 ${filter === tab.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/30"}`}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="border border-dashed border-muted p-20 text-center">
-            <p className="font-mono text-muted-foreground text-sm">{search ? `Sin resultados para "${search}".` : "No hay encargos aquí todavía."}</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {filtered.map((order) => {
-              const s = STATUS_LABELS[order.status] ?? STATUS_LABELS["pending"]!;
-              const hours = agingHours(order.createdAt);
-              const isOld = order.status === "pending" && hours > 24;
-              const isVeryOld = order.status === "pending" && hours > 72;
-              const isExpanded = expandedId === order.id;
-              const isDeleteConfirm = deleteConfirm === order.id;
 
-              return (
-                <motion.div key={order.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                  className={`border bg-card border-l-4 ${s.border} ${isVeryOld ? "border-red-400/40" : isOld ? "border-yellow-400/30" : "border-muted"}`}>
+          <p className="font-mono text-xs text-muted-foreground/50 mb-4">
+            {filtered.length} encargo{filtered.length !== 1 ? "s" : ""}{search ? ` · búsqueda: "${search}"` : ""}
+          </p>
 
-                  {/* Main row */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-0">
-                    <div className="flex-1 min-w-0 p-4 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : order.id)}>
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <span className="font-mono text-xs text-muted-foreground/40">#{order.id}</span>
-                        <span className="font-mono text-sm font-bold">{order.name}</span>
-                        <Badge variant="outline" className={`font-mono text-xs rounded-none px-2 py-0 h-5 ${s.badge}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full mr-1.5 inline-block ${s.dot}`} />
-                          {s.label}
-                        </Badge>
-                        {isVeryOld && <span className="flex items-center gap-1 font-mono text-xs text-red-400"><Flame className="w-3 h-3" />urgente</span>}
-                        {isOld && !isVeryOld && <span className="flex items-center gap-1 font-mono text-xs text-yellow-400/80"><AlertTriangle className="w-3 h-3" />pendiente +24h</span>}
-                        {order.notes && <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground/50"><StickyNote className="w-3 h-3" />nota</span>}
-                        <span className="font-mono text-xs text-muted-foreground/30 ml-auto">{timeAgo(order.createdAt)}</span>
-                      </div>
-                      <p className="font-mono text-sm font-bold text-foreground mb-1">{order.product}</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{order.details}</p>
-                    </div>
+          {loading ? (
+            <div className="flex flex-col gap-3">
+              {[1,2,3].map((i) => <div key={i} className="h-28 border border-muted bg-card animate-pulse" />)}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="border border-dashed border-muted p-20 text-center">
+              <p className="font-mono text-muted-foreground text-sm">{search ? `Sin resultados para "${search}".` : "No hay encargos aquí todavía."}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {filtered.map((order) => {
+                const s = STATUS_LABELS[order.status] ?? STATUS_LABELS["pending"]!;
+                const hours = agingHours(order.createdAt);
+                const isOld = order.status === "pending" && hours > 24;
+                const isVeryOld = order.status === "pending" && hours > 72;
+                const isExpanded = expandedId === order.id;
+                const isDeleteConfirm = deleteConfirm === order.id;
 
-                    {/* Right actions */}
-                    <div className="flex items-center gap-1 px-3 py-2 sm:border-l border-t sm:border-t-0 border-muted/50 shrink-0 bg-card/50">
-                      {/* Status pills */}
-                      <div className="flex flex-col gap-1 mr-2">
-                        {STATUS_KEYS.map((key) => (
-                          <button key={key} onClick={() => updateStatus(order.id, key)} disabled={order.status === key}
-                            className={`font-mono text-xs px-2.5 py-1 transition-all border rounded-none w-24 text-center ${order.status === key ? STATUS_LABELS[key].badge + " cursor-default" : "border-muted text-muted-foreground hover:border-foreground/30 hover:text-foreground"}`}>
-                            {STATUS_LABELS[key].label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        {/* Copy contact */}
-                        <button onClick={() => copyContact(order.id, order.contact)} title="Copiar contacto"
-                          className="w-8 h-8 flex items-center justify-center border border-muted text-muted-foreground hover:text-primary hover:border-primary/40 transition-all rounded-none">
-                          {copiedId === order.id ? <CheckCircle2 className="w-3.5 h-3.5 text-secondary" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                        {/* Notes toggle */}
-                        <button onClick={() => setExpandedId(isExpanded ? null : order.id)} title="Ver detalles y notas"
-                          className={`w-8 h-8 flex items-center justify-center border transition-all rounded-none ${isExpanded ? "border-primary text-primary bg-primary/10" : "border-muted text-muted-foreground hover:text-foreground hover:border-foreground/30"}`}>
-                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        </button>
-                        {/* Delete */}
-                        {!isDeleteConfirm ? (
-                          <button onClick={() => setDeleteConfirm(order.id)} title="Eliminar encargo"
-                            className="w-8 h-8 flex items-center justify-center border border-muted text-muted-foreground hover:text-red-400 hover:border-red-400/40 transition-all rounded-none">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        ) : (
-                          <div className="flex gap-1">
-                            <button onClick={() => deleteOrder(order.id)} className="w-8 h-8 flex items-center justify-center border border-red-400/50 text-red-400 hover:bg-red-400/10 transition-all rounded-none">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => setDeleteConfirm(null)} className="w-8 h-8 flex items-center justify-center border border-muted text-muted-foreground hover:text-foreground transition-all rounded-none">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Expanded panel */}
-                  {isExpanded && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                      className="border-t border-muted bg-background/40">
-                      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Full details */}
-                        <div>
-                          <p className="font-mono text-xs text-muted-foreground/50 uppercase tracking-widest mb-2">Detalles completos</p>
-                          <p className="text-sm text-muted-foreground leading-relaxed mb-4">{order.details}</p>
-                          <div className="flex items-center gap-2">
-                            <p className="font-mono text-xs text-muted-foreground/50">Contacto:</p>
-                            <span className="font-mono text-sm text-primary font-semibold">{order.contact}</span>
-                            <button onClick={() => copyContact(order.id, order.contact)} className="text-muted-foreground hover:text-primary transition-colors">
-                              <Copy className="w-3 h-3" />
-                            </button>
-                          </div>
-                          <p className="font-mono text-xs text-muted-foreground/30 mt-2">
-                            {new Date(order.createdAt).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          </p>
+                return (
+                  <motion.div key={order.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                    className={`border bg-card border-l-4 ${s.border} ${isVeryOld ? "border-red-400/40" : isOld ? "border-yellow-400/30" : "border-muted"}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-0">
+                      <div className="flex-1 min-w-0 p-4 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : order.id)}>
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <span className="font-mono text-xs text-muted-foreground/40">#{order.id}</span>
+                          <span className="font-mono text-sm font-bold">{order.name}</span>
+                          <Badge variant="outline" className={`font-mono text-xs rounded-none px-2 py-0 h-5 ${s.badge}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 inline-block ${s.dot}`} />
+                            {s.label}
+                          </Badge>
+                          {isVeryOld && <span className="flex items-center gap-1 font-mono text-xs text-red-400"><Flame className="w-3 h-3" />urgente</span>}
+                          {isOld && !isVeryOld && <span className="flex items-center gap-1 font-mono text-xs text-yellow-400/80"><AlertTriangle className="w-3 h-3" />pendiente +24h</span>}
+                          {order.notes && <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground/50"><StickyNote className="w-3 h-3" />nota</span>}
+                          <span className="font-mono text-xs text-muted-foreground/30 ml-auto">{timeAgo(order.createdAt)}</span>
                         </div>
-
-                        {/* Notes */}
-                        <div>
-                          <p className="font-mono text-xs text-muted-foreground/50 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                            <StickyNote className="w-3 h-3" /> Notas internas
-                          </p>
-                          <Textarea
-                            value={noteMap[order.id] ?? ""}
-                            onChange={(e) => setNoteMap((p) => ({ ...p, [order.id]: e.target.value }))}
-                            placeholder="Precio acordado, plazo estimado, comentarios internos..."
-                            className="rounded-none border-muted bg-card font-mono text-xs min-h-[80px] resize-none text-foreground"
-                          />
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="font-mono text-xs text-muted-foreground/40">Solo visible para ti</span>
-                            <button onClick={() => saveNote(order.id)} disabled={savingNote === order.id}
-                              className="font-mono text-xs px-3 py-1.5 border border-muted text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-all disabled:opacity-50 rounded-none flex items-center gap-1.5">
-                              {savingNote === order.id ? <><div className="w-3 h-3 border border-t-transparent border-foreground rounded-full animate-spin" />Guardando...</> : <>Guardar nota</>}
+                        <p className="font-mono text-sm font-bold text-foreground mb-1">{order.product}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{order.details}</p>
+                      </div>
+                      <div className="flex items-center gap-1 px-3 py-2 sm:border-l border-t sm:border-t-0 border-muted/50 shrink-0 bg-card/50">
+                        <div className="flex flex-col gap-1 mr-2">
+                          {STATUS_KEYS.map((key) => (
+                            <button key={key} onClick={() => updateStatus(order.id, key)} disabled={order.status === key}
+                              className={`font-mono text-xs px-2.5 py-1 transition-all border rounded-none w-24 text-center ${order.status === key ? STATUS_LABELS[key].badge + " cursor-default" : "border-muted text-muted-foreground hover:border-foreground/30 hover:text-foreground"}`}>
+                              {STATUS_LABELS[key].label}
                             </button>
-                          </div>
+                          ))}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <button onClick={() => copyContact(order.id, order.contact)} title="Copiar contacto"
+                            className="w-8 h-8 flex items-center justify-center border border-muted text-muted-foreground hover:text-primary hover:border-primary/40 transition-all rounded-none">
+                            {copiedId === order.id ? <CheckCircle2 className="w-3.5 h-3.5 text-secondary" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                          <button onClick={() => setExpandedId(isExpanded ? null : order.id)} title="Ver detalles y notas"
+                            className={`w-8 h-8 flex items-center justify-center border transition-all rounded-none ${isExpanded ? "border-primary text-primary bg-primary/10" : "border-muted text-muted-foreground hover:text-foreground hover:border-foreground/30"}`}>
+                            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </button>
+                          {!isDeleteConfirm ? (
+                            <button onClick={() => setDeleteConfirm(order.id)} title="Eliminar encargo"
+                              className="w-8 h-8 flex items-center justify-center border border-muted text-muted-foreground hover:text-red-400 hover:border-red-400/40 transition-all rounded-none">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <div className="flex gap-1">
+                              <button onClick={() => deleteOrder(order.id)} className="w-8 h-8 flex items-center justify-center border border-red-400/50 text-red-400 hover:bg-red-400/10 transition-all rounded-none">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => setDeleteConfirm(null)} className="w-8 h-8 flex items-center justify-center border border-muted text-muted-foreground hover:text-foreground transition-all rounded-none">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </motion.div>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
-        )}
+                    </div>
+                    {isExpanded && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                        className="border-t border-muted bg-background/40">
+                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <p className="font-mono text-xs text-muted-foreground/50 uppercase tracking-widest mb-2">Detalles completos</p>
+                            <p className="text-sm text-muted-foreground leading-relaxed mb-4">{order.details}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono text-xs text-muted-foreground/50">Contacto:</p>
+                              <span className="font-mono text-sm text-primary font-semibold">{order.contact}</span>
+                              <button onClick={() => copyContact(order.id, order.contact)} className="text-muted-foreground hover:text-primary transition-colors">
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <p className="font-mono text-xs text-muted-foreground/30 mt-2">
+                              {new Date(order.createdAt).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="font-mono text-xs text-muted-foreground/50 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                              <StickyNote className="w-3 h-3" /> Notas internas
+                            </p>
+                            <Textarea
+                              value={noteMap[order.id] ?? ""}
+                              onChange={(e) => setNoteMap((p) => ({ ...p, [order.id]: e.target.value }))}
+                              placeholder="Precio acordado, plazo estimado, comentarios internos..."
+                              className="rounded-none border-muted bg-card font-mono text-xs min-h-[80px] resize-none text-foreground"
+                            />
+                            <div className="flex items-center justify-between mt-2">
+                              <span className="font-mono text-xs text-muted-foreground/40">Solo visible para ti</span>
+                              <button onClick={() => saveNote(order.id)} disabled={savingNote === order.id}
+                                className="font-mono text-xs px-3 py-1.5 border border-muted text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-all disabled:opacity-50 rounded-none flex items-center gap-1.5">
+                                {savingNote === order.id ? <><div className="w-3 h-3 border border-t-transparent border-foreground rounded-full animate-spin" />Guardando...</> : <>Guardar nota</>}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
         </div>
         )}
-
       </div>
     </div>
   );
