@@ -835,8 +835,24 @@ function CatalogItemForm({
         </select>
       </div>
       <div className="sm:col-span-2">
-        <label className={labelCls}>URL de imagen (opcional)</label>
-        <input className={inputCls} value={item.imageUrl ?? ""} onChange={(e) => f("imageUrl", e.target.value)} placeholder="https://..." />
+        <label className={labelCls}>Imagen (opcional)</label>
+        <div className="flex gap-2 items-center">
+          <input className={inputCls} value={item.imageUrl ?? ""} onChange={(e) => f("imageUrl", e.target.value)} placeholder="https://..." />
+          <label className="font-mono text-xs px-3 py-2 border border-muted text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-all cursor-pointer whitespace-nowrap">
+            Subir imagen
+            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const formData = new FormData();
+              formData.append("file", file);
+              formData.append("upload_preset", "poisow3d");
+              const res = await fetch("https://api.cloudinary.com/v1_1/evjciqji/image/upload", { method: "POST", body: formData });
+              const data = await res.json();
+              if (data.secure_url) f("imageUrl", data.secure_url);
+            }} />
+          </label>
+        </div>
+        {item.imageUrl && <img src={item.imageUrl} alt="preview" className="mt-2 w-24 h-24 object-cover border border-muted" />}
       </div>
       <div>
         <label className={labelCls}>Orden</label>
