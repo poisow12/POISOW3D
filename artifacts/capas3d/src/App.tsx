@@ -72,7 +72,7 @@ function PrinterVisual() {
   const PR = 270;
   const PW = PR - PL;
   const NOZZLE_DROP = 42;
-  const DEPTH_X = 22;
+  const DEPTH_X = 0;
   const DEPTH_Y = 11;
 
   const goingRight = layerIdx % 2 === 0;
